@@ -118,6 +118,29 @@ class ProjectPermissionTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             sp.check_permission(self.conf,'b','write')
 
+    def test_service_reloads_permissions_every_cycle(self):
+        sp.register_project(self.conf,'test',self.a)
+        first = self.conf
+        second = {'control_repo':'owner/private','projects':{
+            'test':{'path':str(self.a), 'permissions':{'read':True,'write':True,
+                       'terminal':False,'desktop':False,'environment':False}}
+        }}
+        with patch.object(sm,'load_config',return_value=second) as read, \
+             patch.object(sm,'process_once',return_value=0) as process:
+            sm.serve_tasks(first,object(),once=True,reload_config=True)
+        read.assert_called_once()
+        self.assertIs(process.call_args.args[0],second)
+
+    def test_service_detects_control_repo_switch(self):
+        sp.register_project(self.conf,'test',self.a)
+        switched = {'control_repo':'other/private','projects':{}}
+        with patch.object(sm,'load_config',return_value=switched), \
+             patch.object(sm,'process_once') as process, \
+             contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaisesRegex(RuntimeError,'Canal de controle alterado'):
+                sm.serve_tasks(self.conf,object(),once=True,reload_config=True)
+        process.assert_not_called()
+
     def test_cli_projects_prints_expected(self):
         sp.register_project(self.conf,'test',self.a)
         buffer=io.StringIO()
