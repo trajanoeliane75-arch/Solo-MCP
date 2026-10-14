@@ -1,8 +1,16 @@
 # Solo-MCP
 
-Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python local** para trabalhar em arquivos e projetos do próprio computador sem instalar uma API de modelo. Compatível com Linux/macOS e com Windows via WSL (MVP). Apenas biblioteca padrão do Python 3.10+.
+Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python local** para trabalhar em arquivos e projetos do próprio computador sem instalar uma API de modelo. Compatível com Linux/macOS e com Windows via WSL (MVP). O núcleo usa Python 3.10+ e sua biblioteca padrão; ferramentas internas de inspeção são preparadas pelo próprio aplicativo.
 
 > **Importante:** esta versão **não implementa um servidor MCP nativo**. Usa as APIs oficiais do GitHub como transporte. Não substitui Codex/Work, não aumenta limites da assinatura do ChatGPT e não permite que uma conversa rode autonomamente em segundo plano. A IA precisa poder criar Issues no repositório privado e consultar seus comentários.
+
+## Kit essencial autogerenciado
+
+Na primeira abertura de **Gerenciar**, o Solo-MCP oferece preparar seu kit privado de ferramentas. Após confirmação, cria seu ambiente em `~/.local/share/solo-mcp/kit-v1`, instala **Playwright 1.63.0**, baixa **Chromium** e verifica a abertura do navegador. Não usa o Python dos workspaces nem instala pacotes neles.
+
+Na aba **Ambiente**, os botões **Preparar / reparar kit** e **Preparar suporte a janelas X11** permitem preparar componentes internos sem comandos pip. A instalação de pacotes do Linux, quando necessária, requer confirmação e autenticação administrativa separadas. Podman continua opcional para isolamento de projetos.
+
+Consulte o [manual de inspeção visual](docs/INSPECTION.md).
 
 ## Diagnóstico visual de aplicativos — Playwright e Linux
 
@@ -18,8 +26,7 @@ O resultado é enviado como partes verificadas de uma JPEG para comentários
 O ChatGPT deve reconstruir a imagem para analisá-la visualmente.
 Nenhuma captura é executada pelo serviço em segundo plano.
 
-**Playwright, Chromium, xwininfo e ImageMagick são dependências opcionais,
-e devem ser preparados no PC antes do primeiro uso.**
+**Na primeira abertura de Gerenciar, o Solo-MCP oferece preparar Playwright e Chromium automaticamente no seu kit privado.** O suporte a janelas X11 pode exigir uma autorização administrativa separada.
 
 [Como instalar e testar inspeções visuais](docs/INSPECTION.md).
 
@@ -282,4 +289,6 @@ SOLO_MCP_TASK_V1
 python3 -m unittest discover -s tests -v
 ```
 
-Licença MIT. Projeto experimental: examine o código e as permissões antes de rodá-lo.
+**Licença atual:** [PolyForm Noncommercial 1.0.0](LICENSE). Permite estudo, alterações e redistribuição **para finalidades não comerciais**, preservando créditos. Por restringir uso comercial, o código é **source-available, não open source OSI**. Versões anteriormente publicadas sob MIT mantêm suas concessões: a mudança não revoga permissões anteriores. Consulte [Contribuições](CONTRIBUTING.md) e [Histórico da licença](docs/LICENSE_HISTORY.md).
+
+Projeto experimental: examine o código e as permissões antes de rodá-lo.
