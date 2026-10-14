@@ -70,10 +70,9 @@ def check_permission(config, project_name, action):
     missing = [cap for cap in needed if not permissions[cap]]
     if missing:
         raise PermissionError(
-            "Projeto " + str(project_name) + " não permite " +
-            ", ".join(missing) +
-            ". Configure localmente: python3 solo_mcp.py set-permissions --project " +
-            str(project_name) + " --allow read,write,terminal,desktop,environment"
+            "Projeto " + str(project_name) + " não permite " + ", ".join(missing) +
+            ". Conceda apenas as permissões necessárias com "
+            "python3 solo_mcp.py set-permissions --project NOME --allow read,..."
         )
 
 
