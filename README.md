@@ -4,6 +4,25 @@ Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python loca
 
 > **Importante:** esta versão **não implementa um servidor MCP nativo**. Usa as APIs oficiais do GitHub como transporte. Não substitui Codex/Work, não aumenta limites da assinatura do ChatGPT e não permite que uma conversa rode autonomamente em segundo plano. A IA precisa poder criar Issues no repositório privado e consultar seus comentários.
 
+## Diagnóstico visual de aplicativos — Playwright e Linux
+
+O Solo-MCP agora oferece uma ação de **inspeção visual com aprovação local**:
+- **Web:** Playwright abre uma nova sessão Chromium para um aplicativo local
+  (`http://127.0.0.1:3000/`), coleta uma captura JPEG, texto da página e
+  erros limitados do console. Não acessa as abas/cookies do Chrome pessoal.
+- **Aplicativo Linux:** numa sessão X11, você clica na janela desejada após
+  autorizar a tarefa; captura apenas essa janela (Tkinter, GTK, Qt ou Chrome).
+
+O resultado é enviado como partes verificadas de uma JPEG para comentários
+**da Issue privada de controle**, não para este repositório público.
+O ChatGPT deve reconstruir a imagem para analisá-la visualmente.
+Nenhuma captura é executada pelo serviço em segundo plano.
+
+**Playwright, Chromium, xwininfo e ImageMagick são dependências opcionais,
+e devem ser preparados no PC antes do primeiro uso.**
+
+[Como instalar e testar inspeções visuais](docs/INSPECTION.md).
+
 ## Integração Git local e ambientes Python
 
 A aba **Repositórios** consulta automaticamente o Git **da pasta local real**
@@ -238,6 +257,7 @@ O agente consulta Issues abertas e, após executar, comenta `SOLO_MCP_RESULT_V1`
 | `write` | `path`, `content`, `expected_sha256` | Pede aprovação; protege contra sobrescrita inesperada |
 | `sandbox_install` | `packages` | Instala bibliotecas Python num volume Podman, sem acesso ao projeto |
 | `sandbox_run` | `argv` | Roda Python sem rede e com projeto somente leitura |
+| `inspect_screen` | `mode: web/window`, `url` (web) | Captura página local Playwright ou janela X11 após aprovação e envia imagem à Issue privada |
 
 Exemplo de comando:
 
