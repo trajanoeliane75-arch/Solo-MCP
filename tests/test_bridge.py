@@ -56,6 +56,26 @@ class BridgeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             sm.do_task(self.config, {'version':1,'project':'test','action':'write','path':'existing.txt','content':'new'})
 
+    def test_serve_silently_while_idle(self):
+        with patch.object(sm, 'process_once', side_effect=[0, 2]) as process, \
+             patch.object(sm.time, 'sleep', side_effect=[None, KeyboardInterrupt]) as sleep, \
+             patch('builtins.print') as output:
+            with self.assertRaises(KeyboardInterrupt):
+                sm.serve_tasks(self.config, object(), interval=10)
+        self.assertEqual(process.call_count, 2)
+        self.assertEqual(sleep.call_count, 2)
+        self.assertEqual([call.args[0] for call in output.call_args_list],
+                         ['Tarefas executadas: 2'])
+
+    def test_serve_once_does_not_spam_zero(self):
+        with patch.object(sm, 'process_once', return_value=0) as process, \
+             patch.object(sm.time, 'sleep') as sleep, \
+             patch('builtins.print') as output:
+            sm.serve_tasks(self.config, object(), once=True)
+        process.assert_called_once()
+        sleep.assert_not_called()
+        output.assert_not_called()
+
     def test_private_guard(self):
         class Stub:
             def request(self, method, endpoint):
