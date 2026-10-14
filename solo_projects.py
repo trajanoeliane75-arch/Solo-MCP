@@ -22,6 +22,7 @@ ACTION_CAPABILITIES = {
     "run": ("terminal",),
     "open_app": ("desktop",),
     "open_document": ("read", "desktop"),
+    "inspect_screen": ("read", "desktop"),
     "web_search": ("desktop",),
     "venv_create": ("write", "environment"),
     "sandbox_install": ("environment",),
