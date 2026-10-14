@@ -21,14 +21,13 @@ Na janela principal:
 | Repositórios | Adiciona e remove associações a repositórios GitHub e aliases de conta |
 | Permissões | Altera leitura, escrita, terminal, aplicativos e ambientes por projeto |
 | Contexto | Edita o Markdown privado, salva e controla leitura remota explicitamente |
-| Ambiente | Consulta status do serviço e disponibilidade de Podman rootless |
+| Ambiente | Prepara/repara Playwright e Chromium, verifica ferramentas X11, serviço e Podman opcional |
 
 À esquerda, **+ Novo** pede um nome e abre o seletor gráfico de pastas,
 sem exigir o caminho digitado. Cadastros antigos são mostrados automaticamente.
 **Remover cadastro** não apaga diretórios, repositórios ou arquivos do computador.
 
-A janela de gerenciamento não solicita credenciais do GitHub, não faz instalações
-e não ativa privilégios administrativos. Ela gerencia apenas a configuração local.
+Na primeira abertura, a janela oferece preparar o kit interno de Playwright e Chromium, mediante confirmação. Se ferramentas de janelas X11 estiverem faltando, a instalação de pacotes do Linux requer confirmação e autenticação administrativa **separadas**. Nada é instalado silenciosamente.
 
 ## Atualização inicial (uma vez)
 
@@ -70,8 +69,7 @@ continua manual, porque a versão anterior instalada não tem atualizador gráfi
 5. Na aba **Contexto**, anote o objetivo do projeto e clique em
    **Salvar contexto**. O texto fica no arquivo privado do computador.
    **Permitir leitura remota** permanece desligado até sua ativação explícita.
-6. Na aba **Ambiente**, clique em **Verificar serviço e Podman**.
-   O botão faz apenas uma consulta, sem instalar bibliotecas.
+6. Na aba **Ambiente**, aceite o primeiro convite para **Preparar o kit** ou use **Preparar / reparar kit**. Acompanhe o progresso e clique em **Verificar tudo**. Caso necessário, prepare as ferramentas X11 pela segunda opção, com autorização administrativa separada. Podman permanece opcional.
 7. Clique em **+ Novo**, escolha uma pasta de testes existente e veja o
    novo workspace aparecer na lista com **somente leitura**.
 
