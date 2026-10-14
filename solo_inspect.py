@@ -209,6 +209,19 @@ def inspect_window():
     if not found:
         raise RuntimeError("Não foi possível identificar a janela selecionada")
     window_id = found.group(1)
+    # Refuse the X11 root desktop window: only an explicitly selected app window.
+    try:
+        desktop = subprocess.run(
+            ["xwininfo", "-root"], capture_output=True, text=True, timeout=8,
+            check=False
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("Não foi possível validar a janela selecionada") from exc
+    root_match = WINDOW_ID.search(desktop.stdout) if desktop.returncode == 0 else None
+    if root_match is None:
+        raise RuntimeError("Não foi possível validar a janela raiz do desktop")
+    if int(window_id, 16) == int(root_match.group(1), 16):
+        raise RuntimeError("Captura da área de trabalho inteira bloqueada: selecione uma janela")
     try:
         screenshot = subprocess.run(
             ["import", "-window", window_id, "-quality", "55", "jpeg:-"],
