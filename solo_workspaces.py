@@ -210,3 +210,27 @@ def set_context_sharing(config, name, enabled):
     entry = entry_for(config, name)
     entry["share_context"] = enabled
     return enabled
+
+
+def write_context_text(config, name, text):
+    """Save GUI-edited private Markdown atomically, with no intermediate public file."""
+    entry_for(config, name)
+    if not isinstance(text, str):
+        raise ValueError("Conteúdo de contexto inválido")
+    blob = text.encode("utf-8")
+    if not blob or len(blob) > MAX_CONTEXT_BYTES or b"\x00" in blob:
+        raise ValueError("Contexto vazio, binário ou maior que 16 KB")
+    folder = _private_dir(name)
+    destination = folder / CONTEXT_FILENAME
+    if destination.is_symlink():
+        raise ValueError("Symlink bloqueado para arquivo de contexto")
+    fd, temp = tempfile.mkstemp(prefix=".context-", dir=folder)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(blob)
+        os.chmod(temp, 0o600)
+        os.replace(temp, destination)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+    return destination
