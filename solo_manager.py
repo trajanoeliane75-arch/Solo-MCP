@@ -5,11 +5,13 @@ GitHub aliases are metadata; this UI never stores passwords or access tokens.
 """
 import json
 from pathlib import Path
+import webbrowser
 import queue
 import subprocess
 import sys
 import threading
 
+import solo_git
 import solo_mcp as sm
 import solo_projects as projects
 import solo_workspaces as workspaces
@@ -35,6 +37,10 @@ class ManagerBackend:
 
     def details(self, name):
         return workspaces.workspace_info(self.load(), name)
+
+    def git_info(self, name):
+        detail = self.details(name)
+        return solo_git.inspect_local_git(detail["root"])
 
     def create(self, name, folder, repo=""):
         config = self.load()
@@ -98,22 +104,55 @@ class ManagerBackend:
         return enabled
 
     def system_checks(self):
-        """Collect non-privileged status in a background thread."""
+        """Report local service and optional Python sandbox prerequisites."""
         report = []
-        for title, argv in (
-            ("Serviço", ["systemctl", "--user", "is-active", sm.SERVICE_NAME]),
-            ("Podman", ["podman", "info", "--format", "{{.Host.Security.Rootless}}"]),
-        ):
-            try:
-                result = subprocess.run(argv, capture_output=True, text=True, timeout=15)
-                if result.returncode == 0:
-                    output = result.stdout.strip()[:350] or "disponível"
-                else:
-                    output = result.stderr.strip()[:350] or result.stdout.strip()[:350] or "indisponível"
-                report.append(f"{title}: {output}")
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                report.append(f"{title}: indisponível ({type(exc).__name__})")
-        report.append("Instalações e privilégios administrativos não são feitos por esta tela.")
+        try:
+            service = subprocess.run(
+                ["systemctl", "--user", "is-active", sm.SERVICE_NAME],
+                capture_output=True, text=True, timeout=12
+            )
+            report.append(
+                "Serviço Solo-MCP: ativo" if service.returncode == 0
+                and service.stdout.strip() == "active"
+                else "Serviço Solo-MCP: parado ou não encontrado"
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            report.append("Serviço Solo-MCP: não foi possível consultar")
+        report.append("")
+        try:
+            podman = subprocess.run(
+                ["podman", "info", "--format", "{{.Host.Security.Rootless}}"],
+                capture_output=True, text=True, timeout=15
+            )
+            if podman.returncode == 0 and podman.stdout.strip().lower() == "true":
+                report.append("Podman: instalado e funcionando sem root")
+                image = subprocess.run(
+                    ["podman", "image", "exists", "docker.io/library/python:3.12-slim"],
+                    capture_output=True, text=True, timeout=12
+                )
+                report.append(
+                    "Imagem Python 3.12: pronta para uso" if image.returncode == 0
+                    else "Imagem Python 3.12: ainda não baixada"
+                )
+            elif podman.returncode == 0:
+                report.append("Podman instalado, mas o modo sem root não foi confirmado.")
+            else:
+                report.append("Podman encontrado, mas não está funcionando corretamente.")
+        except FileNotFoundError:
+            report.append("Podman: não instalado no computador.")
+        except subprocess.TimeoutExpired:
+            report.append("Podman: consulta excedeu o tempo limite.")
+        except OSError:
+            report.append("Podman: não foi possível executar a verificação.")
+        report.extend((
+            "",
+            "Para que serve? Permite instalar pacotes Python num ambiente separado",
+            "e testar código sem modificar as bibliotecas do Python principal.",
+            "Sem Podman, a leitura dos seus workspaces continua funcionando.",
+            "A instalação de pacotes em contêiner depende de Podman disponível.",
+            "Ações de instalação/execução ainda exigem autorização do usuário.",
+            "Esta tela apenas verifica; não instala nem concede privilégios.",
+        ))
         return "\n".join(report)
 
 
@@ -145,6 +184,8 @@ class ManagerWindow:
         self.current = None
         self._loading = False
         self._repository_rows = []
+        self.git_url = None
+        self._git_info = None
         self._selected_permissions = {}
         self._last_permissions = {}
         self._events = queue.Queue()
@@ -236,27 +277,125 @@ class ManagerWindow:
         self.summary.pack(anchor="w")
 
     def _build_repositories(self):
-        self.ttk.Label(self.tab_repos, text="Repositórios associados",
-                  font=("Sans", 11, "bold")).pack(anchor="w")
-        self.ttk.Label(self.tab_repos,
-                  text="Associação de metadados: não clona, não altera nem autentica repositórios.",
-                  wraplength=610).pack(anchor="w", pady=(4, 8))
+        self.ttk.Label(
+            self.tab_repos, text="Git na pasta do workspace",
+            font=("Sans", 11, "bold")
+        ).pack(anchor="w")
+        self.ttk.Label(
+            self.tab_repos,
+            text="Detecta automaticamente branch, arquivos alterados e repositório "
+                 "remoto usando Git local. Nenhum comando envia dados ao GitHub.",
+            wraplength=610, justify="left"
+        ).pack(anchor="w", pady=(4, 8))
+        self.git_text = self.tk.Text(
+            self.tab_repos, height=7, wrap="word", state="disabled"
+        )
+        self.git_text.pack(fill="x", pady=(0, 8))
+        self._set_git_status("Selecione um workspace para verificar a pasta.")
+        git_buttons = self.ttk.Frame(self.tab_repos)
+        git_buttons.pack(fill="x", pady=(0, 12))
+        self.check_git_button = self.ttk.Button(
+            git_buttons, text="Verificar Git local", command=self.check_git
+        )
+        self.check_git_button.pack(side="left")
+        self.open_github_button = self.ttk.Button(
+            git_buttons, text="Abrir repositório no GitHub",
+            state="disabled", command=self.open_github
+        )
+        self.open_github_button.pack(side="left", padx=(8, 0))
+
+        self.ttk.Separator(self.tab_repos).pack(fill="x", pady=(0, 10))
+        self.ttk.Label(
+            self.tab_repos, text="Referências cadastradas manualmente",
+            font=("Sans", 10, "bold")
+        ).pack(anchor="w")
+        self.ttk.Label(
+            self.tab_repos,
+            text="Somente anotações: não fazem login, clone ou conexão. "
+                 "A detecção Git acima é independente delas.",
+            wraplength=610
+        ).pack(anchor="w", pady=(3, 7))
         self.repo_tree = self.ttk.Treeview(
-            self.tab_repos, columns=("repository", "account"), show="headings",
-            selectmode="browse", height=10)
-        self.repo_tree.heading("repository", text="Repositório")
+            self.tab_repos, columns=("repository", "account"),
+            show="headings", selectmode="browse", height=6
+        )
+        self.repo_tree.heading("repository", text="Referência")
         self.repo_tree.heading("account", text="Alias da conta")
         self.repo_tree.column("repository", width=330)
         self.repo_tree.column("account", width=140)
         self.repo_tree.pack(fill="both", expand=True)
         actions = self.ttk.Frame(self.tab_repos)
-        actions.pack(fill="x", pady=(10, 0))
-        self.add_repo_button = self.ttk.Button(actions, text="+ Vincular repositório",
-                                                command=self.repo_dialog)
+        actions.pack(fill="x", pady=(8, 0))
+        self.add_repo_button = self.ttk.Button(
+            actions, text="+ Adicionar referência (não conecta)",
+            command=self.repo_dialog
+        )
         self.add_repo_button.pack(side="left")
-        self.unlink_repo_button = self.ttk.Button(actions, text="Desvincular selecionado",
-                                                   command=self.unlink_repo)
+        self.unlink_repo_button = self.ttk.Button(
+            actions, text="Remover referência selecionada",
+            command=self.unlink_repo
+        )
         self.unlink_repo_button.pack(side="left", padx=8)
+
+    def _set_git_status(self, content):
+        self.git_text.config(state="normal")
+        self.git_text.delete("1.0", "end")
+        self.git_text.insert("1.0", content)
+        self.git_text.config(state="disabled")
+
+    def _render_git_status(self, result):
+        self._git_info = result
+        url = result.get("github_url")
+        self.git_url = url if (
+            isinstance(url, str) and url.startswith("https://github.com/")
+        ) else None
+        self.open_github_button.configure(
+            state="normal" if self.git_url and self.current else "disabled"
+        )
+        if not result.get("is_repo"):
+            self._set_git_status(result.get("message") or "Pasta sem repositório Git.")
+            return
+        lines = [
+            "Repositório Git detectado: " + str(result["root"]),
+            "Branch: " + (result.get("branch") or "indisponível"),
+            "Arquivos modificados/rastreados: " + str(result["changed"]),
+            "Arquivos não rastreados: " + str(result["untracked"]),
+            "Remoto: " + (result.get("remote_name") or "nenhum"),
+            "GitHub: " + (result.get("github_name") or
+                           "não reconhecido ou remoto não configurado"),
+        ]
+        if result.get("message") and result.get("message").startswith("Não foi possível"):
+            lines.append(result["message"])
+        self._set_git_status("\n".join(lines))
+
+    def check_git(self):
+        if not self.current:
+            return
+        name = self.current
+        self.git_url = None
+        self.open_github_button.configure(state="disabled")
+        self.check_git_button.configure(state="disabled")
+        self._set_git_status("Consultando a pasta com Git (somente leitura)...")
+        def work():
+            try:
+                result = self.backend.git_info(name)
+            except Exception as exc:
+                result = {
+                    "is_repo": False,
+                    "message": "Falha na consulta local: " + str(exc)[:220]
+                }
+            self._events.put(("git", name, result))
+        threading.Thread(target=work, daemon=True).start()
+
+    def open_github(self):
+        from tkinter import messagebox
+        if not self.git_url:
+            messagebox.showinfo(
+                "Solo-MCP", "Este workspace não tem remoto GitHub detectado.",
+                parent=self.root
+            )
+            return
+        webbrowser.open(self.git_url)
 
     def _build_permissions(self):
         self.ttk.Label(self.tab_perms, text="Acesso permitido neste workspace",
@@ -313,9 +452,9 @@ class ManagerWindow:
         self.ttk.Label(self.tab_environment, text="Execução e desenvolvimento",
                   font=("Sans", 11, "bold")).pack(anchor="w")
         self.ttk.Label(self.tab_environment,
-                  text="O agente pode usar Podman rootless para pacotes e testes isolados "
-                       "quando você permitir a capacidade Ambiente. Nenhum instalador ou "
-                       "privilégio administrativo é acionado nesta tela.",
+                  text="Podman executa ambientes separados para instalar bibliotecas Python "
+                       "e testar códigos. Sem ele, as ferramentas de leitura continuam funcionando. "
+                       "Esta aba mostra os requisitos; não instala programas no seu Linux.",
                   wraplength=610).pack(anchor="w", pady=(6, 10))
         self.check_button = self.ttk.Button(
             self.tab_environment, text="Verificar serviço e Podman", command=self.check_environment)
@@ -323,8 +462,9 @@ class ManagerWindow:
         self.environment_text = self.tk.Text(
             self.tab_environment, height=10, wrap="word", state="disabled")
         self.environment_text.pack(fill="both", expand=True, pady=(10, 0))
-        self._set_environment("Clique em Verificar para consultar os componentes locais.\n"
-                              "Contêiner não é uma máquina virtual resistente a malware.")
+        self._set_environment("Podman cria ambientes separados para bibliotecas Python.\n"
+                              "Clique em Verificar para consultar o serviço e os requisitos.\n"
+                              "Contêiner não equivale a uma máquina virtual de segurança.")
 
     def _set_environment(self, content):
         self.environment_text.config(state="normal")
@@ -409,6 +549,10 @@ class ManagerWindow:
             self.path_text.configure(text="—")
             self.active_label.configure(text="Clique em + Novo para começar.")
             self.repo_tree.delete(*self.repo_tree.get_children())
+            self.git_url = None
+            self._git_info = None
+            self._set_git_status("Selecione um workspace.")
+            self.open_github_button.configure(state="disabled")
             self.context_text.delete("1.0", "end")
             self.context_text.edit_modified(False)
             self._disable_actions(True)
@@ -443,11 +587,13 @@ class ManagerWindow:
         self.context_location.configure(
             text="Contexto privado: " + str(workspaces.context_path(name)))
         self._disable_actions(False)
+        self.check_git()
 
     def _disable_actions(self, disabled):
         state = "disabled" if disabled else "normal"
         for widget in (self.select_button, self.folder_button, self.add_repo_button,
-                       self.unlink_repo_button, self.save_permissions_button,
+                       self.unlink_repo_button, self.check_git_button,
+                       self.save_permissions_button,
                        self.save_context_button, self.save_share_button):
             widget.configure(state=state)
 
@@ -509,7 +655,7 @@ class ManagerWindow:
         if not self.current:
             return
         window = self.tk.Toplevel(self.root)
-        window.title("Vincular repositório")
+        window.title("Adicionar referência (não conecta ao GitHub)")
         window.transient(self.root)
         window.resizable(False, False)
         container = self.ttk.Frame(window, padding=16)
@@ -520,7 +666,7 @@ class ManagerWindow:
         self.ttk.Label(container, text="Alias da conta (opcional)").grid(row=2, column=0, sticky="w")
         alias_input = self.ttk.Entry(container, width=48)
         alias_input.grid(row=3, column=0, pady=(3, 9))
-        self.ttk.Label(container, text="Este vínculo não faz login no GitHub.",
+        self.ttk.Label(container, text="Apenas uma anotação. Para ver o Git real, use Verificar Git local.",
                        wraplength=340).grid(row=4, column=0, sticky="w", pady=(2, 10))
         def submit():
             repo, alias = repo_input.get().strip(), alias_input.get().strip()
@@ -608,16 +754,20 @@ class ManagerWindow:
                 data = self.backend.system_checks()
             except Exception as exc:
                 data = f"Falha na verificação: {exc}"
-            self._events.put(data)
+            self._events.put(("environment", None, data))
         threading.Thread(target=work, daemon=True).start()
 
     def _drain_events(self):
         while True:
             try:
-                result = self._events.get_nowait()
+                kind, name, result = self._events.get_nowait()
             except queue.Empty:
                 break
-            self._set_environment(result)
-            self.check_button.configure(state="normal")
+            if kind == "environment":
+                self._set_environment(result)
+                self.check_button.configure(state="normal")
+            elif kind == "git" and name == self.current:
+                self._render_git_status(result)
+                self.check_git_button.configure(state="normal")
         if self.root.winfo_exists():
             self.root.after(200, self._drain_events)
