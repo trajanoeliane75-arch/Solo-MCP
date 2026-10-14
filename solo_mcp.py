@@ -19,6 +19,8 @@ import urllib.request
 import zipfile
 
 CONFIG_PATH = Path.home() / '.config' / 'solo-mcp' / 'config.json'
+SERVICE_FILE = Path.home() / '.config' / 'systemd' / 'user' / 'solo-mcp.service'
+SERVICE_NAME = 'solo-mcp.service'
 MARKER = 'SOLO_MCP_TASK_V1'
 RESULT_MARKER = 'SOLO_MCP_RESULT_V1'
 READ_LIMIT = 20000
@@ -219,7 +221,7 @@ def parse_task(body):
     return task if isinstance(task, dict) and task.get('version') == 1 else None
 
 
-def process_once(config, gh):
+def process_once(config, gh, background=False, issue_number=None, sensitive_only=False):
     repo = config['control_repo']
     info = require_private_repo(gh, repo)
     owner = info['owner']['login'].lower()
@@ -233,6 +235,12 @@ def process_once(config, gh):
         if task is None:
             continue
         number = int(issue['number'])
+        if issue_number is not None and number != issue_number:
+            continue
+        if background and task.get('action') in ('run', 'write'):
+            continue  # sem TTY: deixe pendente para aprovação explícita no CLI
+        if sensitive_only and task.get('action') not in ('run', 'write'):
+            continue
         path = '/repos/' + repo + '/issues/' + str(number)
         previous = gh.request('GET', path + '/comments?per_page=100')
         if any(c.get('body', '').startswith(RESULT_MARKER) for c in previous):
@@ -250,11 +258,11 @@ def process_once(config, gh):
     return total
 
 
-def serve_tasks(config, gh, once=False, interval=10):
+def serve_tasks(config, gh, once=False, interval=10, background=False):
     """Consulta tarefas continuamente; só imprime quando há trabalho ou erro."""
     while True:
         try:
-            total = process_once(config, gh)
+            total = process_once(config, gh, background=background)
             if total:
                 print(f'Tarefas executadas: {total}', flush=True)
         except Exception as ex:
@@ -264,6 +272,92 @@ def serve_tasks(config, gh, once=False, interval=10):
         if once:
             return
         time.sleep(max(10, interval))
+
+
+def _unit_quote(value):
+    """Quote absolute command paths for systemd, including %-specifier escaping."""
+    value = str(value)
+    if not value.startswith('/') or any(c in value for c in '\r\n\x00'):
+        raise ValueError('Caminho absoluto inválido para unidade systemd')
+    return '"' + value.replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%') + '"'
+
+
+def generate_user_unit(script_path=None, python_path=None):
+    """Generate a background-only, non-root systemd user unit."""
+    script = Path(script_path or __file__).resolve()
+    python = Path(python_path or sys.executable).resolve()
+    return (
+        '[Unit]\n'
+        'Description=Solo-MCP - ponte de tarefas GitHub\n'
+        'Wants=network-online.target\n'
+        'After=network-online.target\n\n'
+        '[Service]\n'
+        'Type=simple\n'
+        f'ExecStart={_unit_quote(python)} {_unit_quote(script)} serve --background\n'
+        f'WorkingDirectory={_unit_quote(script.parent)}\n'
+        'Restart=on-failure\n'
+        'RestartSec=10\n'
+        'NoNewPrivileges=true\n'
+        'UMask=0077\n'
+        'PrivateTmp=true\n\n'
+        '[Install]\n'
+        'WantedBy=default.target\n'
+    )
+
+
+def manage_service(action):
+    """Install and manage a service in the current user's systemd session."""
+    if sys.platform != 'linux':
+        raise RuntimeError('Serviço systemd --user disponível somente no Linux')
+    base = ['systemctl', '--user']
+    if action == 'install':
+        load_config()  # Evita instalar serviço sem configuração
+        SERVICE_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        content = generate_user_unit()
+        if SERVICE_FILE.exists() and SERVICE_FILE.read_text(encoding='utf-8') != content:
+            raise RuntimeError('Unidade já existe e é diferente; revise antes de substituir')
+        SERVICE_FILE.write_text(content, encoding='utf-8')
+        SERVICE_FILE.chmod(0o600)
+        subprocess.run(base + ['daemon-reload'], check=True)
+        subprocess.run(base + ['enable', '--now', SERVICE_NAME], check=True)
+        print('Serviço instalado e iniciado. Execute: python3 solo_mcp.py service status')
+        return
+    if action == 'uninstall':
+        subprocess.run(base + ['disable', '--now', SERVICE_NAME], check=True)
+        SERVICE_FILE.unlink(missing_ok=True)
+        subprocess.run(base + ['daemon-reload'], check=True)
+        print('Serviço removido; seus projetos e configuração foram preservados.')
+        return
+    if action == 'logs':
+        subprocess.run(['journalctl', '--user', '-u', SERVICE_NAME,
+                        '-n', '50', '--no-pager'], check=True)
+        return
+    if action not in ('start', 'stop', 'restart', 'status'):
+        raise ValueError('Ação de serviço não suportada: ' + action)
+    argv = base + [action]
+    if action == 'status':
+        argv += ['--no-pager', SERVICE_NAME]
+        # systemctl status pode retornar 3 se o serviço estiver parado
+        subprocess.run(argv, check=False)
+    else:
+        subprocess.run(argv + [SERVICE_NAME], check=True)
+
+
+def pending_tasks(config, gh):
+    """Show mutating tasks awaiting user confirmation, without exposing content."""
+    repo = config['control_repo']
+    info = require_private_repo(gh, repo)
+    owner = info['owner']['login'].lower()
+    query = urllib.parse.urlencode({'state': 'open', 'per_page': 100})
+    issues = gh.request('GET', '/repos/' + repo + '/issues?' + query)
+    pending = []
+    for issue in issues:
+        if issue.get('pull_request') or issue.get('user', {}).get('login', '').lower() != owner:
+            continue
+        task = parse_task(issue.get('body', ''))
+        if task and task.get('action') in ('run', 'write'):
+            pending.append((int(issue['number']), str(task.get('project')), task['action']))
+    return sorted(pending)
 
 
 def cli():
@@ -278,6 +372,12 @@ def cli():
     run = sub.add_parser('serve', help='Escutar novas tarefas')
     run.add_argument('--once', action='store_true')
     run.add_argument('--interval', type=int, default=10)
+    run.add_argument('--background', action='store_true', help='Sem TTY: deixar run/write pendentes de aprovação')
+    service = sub.add_parser('service', help='Gerenciar serviço systemd --user')
+    service.add_argument('action', choices=['install', 'start', 'stop', 'restart', 'status', 'logs', 'uninstall'])
+    sub.add_parser('pending', help='Mostrar tarefas aguardando aprovação')
+    approve_cmd = sub.add_parser('approve', help='Processar tarefa mutável com confirmação S/N no terminal')
+    approve_cmd.add_argument('--issue', type=int, required=True)
     args = ap.parse_args()
     if args.command == 'init':
         if CONFIG_PATH.exists():
@@ -292,15 +392,34 @@ def cli():
         conf.setdefault('projects', {})[args.name] = {'path': str(root), 'github': args.repo}
         save_config(conf)
         print(f'Projeto {args.name} registrado: {root}')
+    elif args.command == 'service':
+        manage_service(args.action)
+    elif args.command == 'pending':
+        conf = load_config()
+        gh = Github(gh_token())
+        tasks = pending_tasks(conf, gh)
+        if not tasks:
+            print('Nenhuma tarefa aguardando aprovação.')
+        for number, project, action in tasks:
+            print(f'#{number} projeto={project} ação={action} | python3 solo_mcp.py approve --issue {number}')
+    elif args.command == 'approve':
+        if not sys.stdin.isatty():
+            ap.error('Aprovação exige terminal interativo (TTY)')
+        conf = load_config()
+        gh = Github(gh_token())
+        count = process_once(conf, gh, issue_number=args.issue, sensitive_only=True)
+        if count == 0:
+            print('Issue não encontrada, já concluída ou não requer aprovação.')
     elif args.command == 'serve':
         conf = load_config()
         gh = Github(gh_token())
         require_private_repo(gh, conf['control_repo'])
         print('Ponte conectada a', conf['control_repo'])
         if not args.once:
-            print(f'Aguardando tarefas (consulta a cada {max(10, args.interval)}s). Ctrl+C para sair.')
+            mode = 'somente leitura' if args.background else 'interativo'
+            print(f'Aguardando tarefas ({mode}, consulta a cada {max(10, args.interval)}s). Ctrl+C para sair.')
         try:
-            serve_tasks(conf, gh, once=args.once, interval=args.interval)
+            serve_tasks(conf, gh, once=args.once, interval=args.interval, background=args.background)
         except KeyboardInterrupt:
             print('\nPonte encerrada.')
 
