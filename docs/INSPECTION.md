@@ -33,9 +33,9 @@ mensagens privadas ou dados que não deseja enviar ao GitHub.
 
 ## Preparação automática do kit interno
 
-O usuário não precisa executar comandos pip nem preparar Playwright ou Chromium manualmente. Depois de atualizar o Solo-MCP, abra o painel de aprovações e clique em **Gerenciar**. Na primeira abertura, o aplicativo pergunta se você quer preparar seu **kit essencial**.
+O usuário não precisa executar comandos pip nem preparar Playwright ou Chromium manualmente. Depois de atualizar o Solo-MCP, abra **Ferramentas → Preparar kit** na janela principal.
 
-Após a confirmação, ele cria um ambiente Python privado em `~/.local/share/solo-mcp/kit-v1`, instala uma versão definida do Playwright, baixa o Chromium e abre o navegador num teste real. As etapas aparecem na aba **Ambiente**, que também oferece **Preparar / reparar kit** em caso de falha.
+Após a confirmação, ele cria um ambiente Python privado em `~/.local/share/solo-mcp/kit-v1`, instala uma versão definida do Playwright, baixa o Chromium e abre o navegador num teste real. As etapas aparecem no painel de progresso, com **Ver detalhes**. A página **Ferramentas** oferece **Reparar kit** em caso de falha.
 
 O kit é propriedade do aplicativo: não é compartilhado com o Python principal, nem com bibliotecas e ambientes dos workspaces. Exige conexão com a internet na primeira instalação. Se bibliotecas do sistema operacional faltarem, o programa informa que a preparação não foi concluída.
 

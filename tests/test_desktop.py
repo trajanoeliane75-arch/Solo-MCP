@@ -116,7 +116,8 @@ class DesktopTests(unittest.TestCase):
             gui.manage_autostart('install')
             path=gui.autostart_path()
             self.assertTrue(path.is_file())
-            self.assertIn('solo_mcp.py',path.read_text())
+            self.assertIn('launch.py',path.read_text())
+            self.assertIn('Terminal=false',path.read_text())
             gui.manage_autostart('uninstall')
             self.assertFalse(path.exists())
 

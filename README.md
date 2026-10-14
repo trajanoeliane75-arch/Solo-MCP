@@ -1,69 +1,40 @@
 # Solo-MCP
 
-Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python local** para trabalhar em arquivos e projetos do próprio computador sem instalar uma API de modelo. Compatível com Linux/macOS e com Windows via WSL (MVP). O núcleo usa Python 3.10+ e sua biblioteca padrão; ferramentas internas de inspeção são preparadas pelo próprio aplicativo.
+Uma janela para seus projetos locais, contexto, permissões e aprovações de
+tarefas da IA. A interface desktop usa **Python + GTK/WebKitGTK**, com HTML/CSS
+local, sem terminal no uso diário, sem Electron e sem build de frontend.
 
-> **Importante:** esta versão **não implementa um servidor MCP nativo**. Usa as APIs oficiais do GitHub como transporte. Não substitui Codex/Work, não aumenta limites da assinatura do ChatGPT e não permite que uma conversa rode autonomamente em segundo plano. A IA precisa poder criar Issues no repositório privado e consultar seus comentários.
+> O núcleo é uma ponte experimental **ChatGPT ↔ GitHub Issues privadas ↔ agente
+> Python local**. Ainda não implementa um servidor do protocolo MCP. A conversa
+> precisa conseguir criar Issues e consultar os resultados pelo GitHub.
 
-## Kit essencial autogerenciado
+## Nova experiência desktop
 
-Na primeira abertura de **Gerenciar**, o Solo-MCP oferece preparar seu kit privado de ferramentas. Após confirmação, cria seu ambiente em `~/.local/share/solo-mcp/kit-v1`, instala **Playwright 1.63.0**, baixa **Chromium** e verifica a abertura do navegador. Não usa o Python dos workspaces nem instala pacotes neles.
+- **Início:** próximos passos, projetos e estados reais do serviço e das ferramentas.
+- **Workspaces:** cadastro por pasta, validação com contador de caracteres e contexto com confirmação de salvamento.
+- **Aprovações:** prévia completa, autorização ou recusa na mesma janela.
+- **Ferramentas:** preparação guiada de Playwright/Chromium; Podman e captura X11 separados como opcionais.
+- **Configurações:** conexão GitHub pelo navegador, controle do serviço e abertura automática no login.
 
-Na aba **Ambiente**, os botões **Preparar / reparar kit** e **Preparar suporte a janelas X11** permitem preparar componentes internos sem comandos pip. A instalação de pacotes do Linux, quando necessária, requer confirmação e autenticação administrativa separadas. Podman continua opcional para isolamento de projetos.
+Os dados já existentes são preservados. O contexto continua privado até você
+permitir leitura pelas tarefas. Novos workspaces começam somente com leitura.
 
-Consulte o [manual de inspeção visual](docs/INSPECTION.md).
+**[Instalação e guia da interface](docs/GUI.md)** ·
+**[Decisões do redesign](docs/REDESIGN.md)** ·
+**[Inspeção visual](docs/INSPECTION.md)** ·
+**[Git local e Python](docs/GIT_AND_PYTHON.md)**
 
-## Diagnóstico visual de aplicativos — Playwright e Linux
+## Kit de inspeção autogerenciado
 
-O Solo-MCP agora oferece uma ação de **inspeção visual com aprovação local**:
-- **Web:** Playwright abre uma nova sessão Chromium para um aplicativo local
-  (`http://127.0.0.1:3000/`), coleta uma captura JPEG, texto da página e
-  erros limitados do console. Não acessa as abas/cookies do Chrome pessoal.
-- **Aplicativo Linux:** numa sessão X11, você clica na janela desejada após
-  autorizar a tarefa; captura apenas essa janela (Tkinter, GTK, Qt ou Chrome).
+Em **Ferramentas → Preparar kit**, o Solo-MCP cria seu ambiente privado em
+`~/.local/share/solo-mcp/kit-v1`, instala **Playwright 1.63.0**, baixa Chromium
+e testa a abertura do navegador. A operação mostra progresso e resultado;
+nenhum pacote é instalado no Python dos seus projetos.
 
-O resultado é enviado como partes verificadas de uma JPEG para comentários
-**da Issue privada de controle**, não para este repositório público.
-O ChatGPT deve reconstruir a imagem para analisá-la visualmente.
-Nenhuma captura é executada pelo serviço em segundo plano.
-
-**Na primeira abertura de Gerenciar, o Solo-MCP oferece preparar Playwright e Chromium automaticamente no seu kit privado.** O suporte a janelas X11 pode exigir uma autorização administrativa separada.
-
-[Como instalar e testar inspeções visuais](docs/INSPECTION.md).
-
-## Integração Git local e ambientes Python
-
-A aba **Repositórios** consulta automaticamente o Git **da pasta local real**
-do workspace. Mostra branch, arquivos alterados, arquivos não rastreados e
-remoto. Quando encontra um remoto GitHub válido, oferece
-**Abrir repositório no GitHub**. A verificação é somente leitura: **não**
-faz login, clone, fetch, pull ou push.
-
-As referências adicionadas manualmente são rotuladas explicitamente
-como **anotações**, não como conexões. Credenciais embutidas nas URLs de
-remotos não são mostradas nem incluídas no link do navegador.
-
-A aba **Ambiente** permanece: o Podman permite isolar a execução de
-Python e o uso de bibliotecas em contêineres. Sem Podman instalado,
-a leitura de projetos e as funções Git continuam operacionais.
-A aba detecta o estado e explica o requisito; não instala programas.
-
-**[Guia: Git local, Podman e ambientes Python](docs/GIT_AND_PYTHON.md)**.
-
-## Gerenciamento pela interface gráfica
-
-A janela principal já permite **criar workspaces por seletor de pasta**,
-vincular/desvincular repositórios (inclusive referências de contas diferentes),
-configurar **permissões por projeto**, editar o **contexto privado** e consultar
-o status de serviços e Podman.
-
-Clique em **Gerenciar** no painel compacto **Solo-MCP · Aprovações**.
-O painel continua aberto e funcionando enquanto você gerencia os projetos.
-
-Após atualizar o código com `git pull --ff-only`, reinicie o painel compacto
-para aparecer o novo botão. A janela principal também pode ser iniciada para
-diagnóstico com `python3 solo_mcp.py manager`.
-
-**[Manual e testes da interface gráfica](docs/GUI.md)**.
+A interface usa o WebKit do sistema. Chromium é utilizado apenas pela inspeção
+web, quando solicitada. Captura de janelas exige sessão X11 e suas ferramentas;
+Podman é opcional para ambientes Python separados. A instalação de componentes
+do Linux usa autenticação administrativa do próprio sistema.
 
 ## Workspaces persistentes (como áreas de trabalho do Codex)
 
@@ -117,89 +88,30 @@ Documentação completa: **[Permissões, novos projetos, Podman rootless e DOCX]
 - Ações de terminal e gravação de arquivos requerem confirmação local **[s/N]** (`S` ou `s` autoriza, `N`, `n` e Enter cancelam). Os comandos são executados sem shell; há lista de programas admitidos, tempo limite e limite de saída.
 - Não configure `sudo`, não execute o agente como root e não use um repositório de controle compartilhado com usuários não confiáveis.
 
-## Instalar
+## Instalar e usar pelo desktop
 
-1. Faça um **repositório GitHub separado e PRIVADO** (ex.: `seu-usuario/solo-mcp-control`) apenas para tarefas e logs. **Não use `Solo-MCP` público como controle.**
-2. Conecte o repositório privado ao mesmo conector GitHub do ChatGPT. Para contas com GitHub App, selecione-o nas permissões da instalação.
-3. No computador (Python 3.10+), clone a ferramenta e rode:
+Clone o repositório e abra **Solo-MCP.desktop** pelo gerenciador de arquivos
+(“Permitir iniciar”, se solicitado), ou abra `install.sh`. Como alternativa, execute
+`./install.sh` uma vez na pasta clonada. O instalador prepara a interface e
+registra **Solo-MCP** no menu do Linux. Depois disso, abra pelo ícone, sem terminal.
 
-```bash
-git clone https://github.com/trajanoeliane75-arch/Solo-MCP.git
-cd Solo-MCP
-python3 solo_mcp.py init --control SEU_USUARIO/SEU_REPO_PRIVADO
-python3 solo_mcp.py add-project --name sumup --path "$HOME/projetos/sumup-solo-lab" --repo trajanoeliane75-arch/sumup-solo-lab
-```
+Em **Configurações**, conecte sua conta pelo navegador, informe um repositório
+privado de controle e clique em **Verificar e salvar conexão**. Ative o serviço
+para receber tarefas em segundo plano. Em **Ferramentas**, prepare a inspeção
+web ou instale os recursos opcionais de que precisar.
 
-4. Instale o GitHub CLI (`gh`) e execute `gh auth login`, **ou** forneça seu token somente pelo ambiente local. A configuração de projetos fica em `~/.config/solo-mcp/config.json` (permissões `0600`), fora do repositório.
-5. Inicie o agente:
+A instalação guiada de componentes do sistema é oferecida em Debian/Ubuntu com
+Zenity e Polkit. Consulte os pacotes para outras distribuições no
+[manual desktop](docs/GUI.md). Não é preciso instalar Tkinter, Node ou Electron.
 
-```bash
-python3 solo_mcp.py serve
-# ou, para testar uma única consulta:
-python3 solo_mcp.py serve --once
-```
+O serviço usa systemd do usuário. A janela fecha sem parar o serviço; operações
+sensíveis aguardam sua decisão em **Aprovações**. Não execute outro processo
+`serve` junto ao serviço. A instância única da janela não substitui idempotência
+distribuída entre clientes CLI e múltiplos agentes.
 
-O processo permanece em espera **sem imprimir "Tarefas executadas: 0"**. Ao encontrar uma nova tarefa, executa-a e mostra o resultado no terminal. A consulta é feita a cada **10 segundos**, por padrão (configure com `--interval 30`, por exemplo). Use `Ctrl+C` para parar. Não precisa de porta exposta nem tunnel. Isso é *polling* automático, não um webhook ou hot reload do código: tarefas novas são detectadas sem reiniciar o agente, mas atualizações do programa ainda exigem `git pull` e reinicialização.
-
-## Serviço em segundo plano no Linux (systemd --user)
-
-Não precisa manter um terminal aberto. Pare o agente interativo com Ctrl+C, atualize o repositório e, após confirmar que `gh auth token` funciona, instale o serviço:
-
-```bash
-python3 solo_mcp.py service install
-python3 solo_mcp.py service status
-python3 solo_mcp.py service logs
-```
-
-Se o Linux acusar **"Unit solo-mcp.service has a bad unit file setting"** em uma versão antiga, há um reparo seguro do gerador WorkingDirectory=:
-
-```bash
-cd ~/Solo-MCP
-git pull --ff-only
-python3 -m unittest discover -s tests -v
-python3 solo_mcp.py service repair
-python3 solo_mcp.py service status
-```
-
-O comando repair preserva a configuração dos seus projetos, salva um backup da unidade anterior em ~/.config/systemd/user/solo-mcp.service.bak, recarrega o systemd e reinicia o serviço. O reparo se recusa a substituir uma unidade que não parece pertencer ao Solo-MCP. Se houver erro, envie a saída de `systemctl --user status solo-mcp.service --no-pager` e `python3 solo_mcp.py service logs`. Não use sudo para o serviço do usuário.
-
-O serviço inicia automaticamente ao entrar na sessão Linux e consulta a fila em silêncio a cada 10 segundos, enquanto estiver ativo. Para parar: `python3 solo_mcp.py service stop`; reiniciar: `python3 solo_mcp.py service restart`; remover apenas o serviço: `python3 solo_mcp.py service uninstall`.
-
-**Aprovações em segundo plano:** o serviço **não executa `run` ou `write` sem confirmação**. Essas Issues permanecem abertas, aguardando revisão. Em qualquer terminal, execute:
-
-```bash
-cd ~/Solo-MCP
-python3 solo_mcp.py pending
-python3 solo_mcp.py approve --issue NUMERO
-```
-
-Veja a operação apresentada e digite `s` para autorizar ou `n` para rejeitar. Operações de leitura e diagnóstico continuam automáticas. Não rode o serviço e outro `serve` simultaneamente; no estado atual, execução concorrente não tem garantia de exclusão mútua.
-
-Serviços `systemd --user` são executados na sessão do usuário, **não como root**. Fora da sessão, a inicialização após desligar/logoff depende da configuração de *linger* do Linux; não ativamos isso automaticamente. Se o serviço falhar por não encontrar credenciais, verifique `gh auth token` e os logs. O serviço não consegue pedir `S/N` em segundo plano, por isso delegamos essas aprovações ao CLI.
-
-## Painel de aprovações no canto da tela (Linux)
-
-O serviço continua rodando em segundo plano. Abra o **painel gráfico separado**, que fica sempre visível no canto superior direito, lista tarefas pendentes, mostra o JSON completo e apresenta botões **Autorizar** e **Recusar**:
-
-```bash
-# Ubuntu/Debian: instale uma vez se necessário
-sudo apt install python3-tk xdg-utils libnotify-bin
-
-cd ~/Solo-MCP
-python3 solo_mcp.py desktop
-```
-
-Para iniciar automaticamente o painel ao fazer login na interface gráfica, instale um arquivo XDG Autostart (sem alterar o serviço):
-
-```bash
-python3 solo_mcp.py desktop-autostart install
-# para desativar:
-python3 solo_mcp.py desktop-autostart uninstall
-```
-
-**Autorização:** antes de executar, o painel consulta a Issue novamente e compara a impressão digital SHA-256 da tarefa à prévia aprovada. Se a tarefa foi editada, exige nova revisão. Nenhuma operação sensível é executada silenciosamente. **Aprovações do painel não conferem privilégios administrativos.** O painel deve rodar na sessão gráfica; o serviço systemd --user permanece sem acesso à interface.
-
-Não inicie vários painéis nem outras instâncias do servidor: ainda precisamos implementar bloqueio distribuído e idempotência completa.
+Os comandos CLI continuam disponíveis para desenvolvimento e diagnóstico:
+`service install|start|stop|restart|repair|status|logs`, `pending`, `approve`,
+`manager` e `desktop`. Os dois últimos abrem a nova interface.
 
 ### Ações gráficas e de desenvolvimento (experimentais)
 

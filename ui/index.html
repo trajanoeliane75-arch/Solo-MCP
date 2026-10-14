@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Solo-MCP</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a href="#main" class="skip-link">Ir para o conteúdo</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+      <button class="brand" data-action="nav" data-page="home" aria-label="Solo-MCP, início"><span class="brand-symbol">s</span><span>Solo<span class="brand-light"> / MCP</span></span></button>
+      <div class="local-label"><span class="dot"></span> Seu espaço local</div>
+      <nav id="navigation"></nav>
+      <div class="sidebar-section"><span>WORKSPACES</span><button class="icon-button" data-action="create" aria-label="Novo workspace"><img src="icons/plus.svg" alt=""></button></div>
+      <div id="workspace-nav" class="workspace-nav"></div>
+      <div class="sidebar-bottom">
+        <button class="nav-item" data-action="nav" data-page="help"><img src="icons/circle-help.svg" alt="">Como funciona</button>
+        <button class="nav-item" data-action="nav" data-page="settings"><img src="icons/settings-2.svg" alt="">Configurações</button>
+        <div id="service-status" class="service-status"></div>
+      </div>
+    </aside>
+    <div class="main-shell">
+      <header class="topbar"><div id="breadcrumb">Início</div><div class="topbar-actions"><span class="local-note"><img src="icons/lock-keyhole.svg" alt=""> Armazenamento local</span><button id="theme-toggle" class="icon-button" data-action="theme" aria-label="Mudar tema"><img src="icons/moon.svg" alt=""></button></div></header>
+      <div id="preview-notice" hidden>Ambiente de teste · dados temporários, separados dos seus projetos</div>
+      <main id="main" tabindex="-1"><div class="loading-state" role="status">Abrindo seu espaço…</div></main>
+      <div id="job-banner" hidden aria-live="polite"></div>
+    </div>
+  </div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+</body>
+</html>
