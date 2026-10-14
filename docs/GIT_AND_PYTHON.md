@@ -44,6 +44,12 @@ O resultado depende da pasta cadastrada. Se ela não for um clone Git,
 a interface explica que não há repositório local. Isso não impede
 acesso aos arquivos daquele workspace.
 
+## Kit essencial independente dos projetos
+
+O Solo-MCP prepara seu próprio Playwright e Chromium no primeiro uso da interface, com autorização do usuário. O kit fica em `~/.local/share/solo-mcp/kit-v1` e é separado do Python principal e dos ambientes de cada workspace. A aba **Ambiente** permite preparar/reparar o kit e verificar se funciona. Não é preciso conhecer pip ou venv para utilizar as inspeções.
+
+O suporte X11 para capturar janelas pode exigir a instalação de pacotes do sistema operacional, com confirmação e autenticação administrativa separadas. [Detalhes da inspeção visual](INSPECTION.md).
+
 ## Aba Ambiente — para que serve Podman?
 
 **Podman** executa contêineres: ambientes separados para Python, pacotes,
