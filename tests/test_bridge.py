@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import zipfile
 import sys
@@ -39,6 +40,16 @@ class BridgeTests(unittest.TestCase):
     def test_parse_task(self):
         self.assertIsNone(sm.parse_task('hello'))
         self.assertIsNotNone(sm.parse_task(sm.MARKER + '\n' + json.dumps({'version':1,'project':'x','action':'list'})))
+
+    def test_approve_sn(self):
+        for response in ('s', 'S', ' s ', ' S '):
+            with self.subTest(response=response):
+                with patch('builtins.input', return_value=response):
+                    self.assertTrue(sm.approve('Operação de teste'))
+        for response in ('n', 'N', '', 'aprovar', 'sim', 'qualquer'):
+            with self.subTest(response=response):
+                with patch('builtins.input', return_value=response):
+                    self.assertFalse(sm.approve('Operação de teste'))
 
     def test_write_requires_expected_sha(self):
         (self.root/'existing.txt').write_text('old')
