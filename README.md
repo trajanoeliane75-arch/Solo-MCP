@@ -47,6 +47,18 @@ python3 solo_mcp.py service status
 python3 solo_mcp.py service logs
 ```
 
+Se o Linux acusar **"Unit solo-mcp.service has a bad unit file setting"** em uma versão antiga, há um reparo seguro do gerador WorkingDirectory=:
+
+```bash
+cd ~/Solo-MCP
+git pull --ff-only
+python3 -m unittest discover -s tests -v
+python3 solo_mcp.py service repair
+python3 solo_mcp.py service status
+```
+
+O comando repair preserva a configuração dos seus projetos, salva um backup da unidade anterior em ~/.config/systemd/user/solo-mcp.service.bak, recarrega o systemd e reinicia o serviço. O reparo se recusa a substituir uma unidade que não parece pertencer ao Solo-MCP. Se houver erro, envie a saída de `systemctl --user status solo-mcp.service --no-pager` e `python3 solo_mcp.py service logs`. Não use sudo para o serviço do usuário.
+
 O serviço inicia automaticamente ao entrar na sessão Linux e consulta a fila em silêncio a cada 10 segundos, enquanto estiver ativo. Para parar: `python3 solo_mcp.py service stop`; reiniciar: `python3 solo_mcp.py service restart`; remover apenas o serviço: `python3 solo_mcp.py service uninstall`.
 
 **Aprovações em segundo plano:** o serviço **não executa `run` ou `write` sem confirmação**. Essas Issues permanecem abertas, aguardando revisão. Em qualquer terminal, execute:
