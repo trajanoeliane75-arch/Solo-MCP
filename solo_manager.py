@@ -218,16 +218,16 @@ class ManagerWindow:
         root.after(200, self._drain_events)
 
     def _build_general(self):
-        ttk.Label(self.tab_general, text="Pasta local", font=("Sans", 11, "bold")).pack(anchor="w")
+        self.ttk.Label(self.tab_general, text="Pasta local", font=("Sans", 11, "bold")).pack(anchor="w")
         self.path_text = self.ttk.Label(self.tab_general, text="—", wraplength=600)
         self.path_text.pack(anchor="w", pady=(3, 12))
         self.folder_button = self.ttk.Button(self.tab_general, text="Abrir pasta no gerenciador de arquivos",
                                              command=self.open_folder)
         self.folder_button.pack(anchor="w", pady=(0, 12))
-        ttk.Separator(self.tab_general).pack(fill="x", pady=8)
-        ttk.Label(self.tab_general, text="Projeto e repositórios são independentes",
+        self.ttk.Separator(self.tab_general).pack(fill="x", pady=8)
+        self.ttk.Label(self.tab_general, text="Projeto e repositórios são independentes",
                   font=("Sans", 11, "bold")).pack(anchor="w")
-        ttk.Label(self.tab_general,
+        self.ttk.Label(self.tab_general,
                   text="Este workspace representa uma pasta e um contexto persistente. "
                        "Você pode associar vários repositórios GitHub, mas o vínculo não "
                        "conecta uma conta nem concede acesso a repositórios privados.",
@@ -236,9 +236,9 @@ class ManagerWindow:
         self.summary.pack(anchor="w")
 
     def _build_repositories(self):
-        ttk.Label(self.tab_repos, text="Repositórios associados",
+        self.ttk.Label(self.tab_repos, text="Repositórios associados",
                   font=("Sans", 11, "bold")).pack(anchor="w")
-        ttk.Label(self.tab_repos,
+        self.ttk.Label(self.tab_repos,
                   text="Associação de metadados: não clona, não altera nem autentica repositórios.",
                   wraplength=610).pack(anchor="w", pady=(4, 8))
         self.repo_tree = self.ttk.Treeview(
@@ -259,9 +259,9 @@ class ManagerWindow:
         self.unlink_repo_button.pack(side="left", padx=8)
 
     def _build_permissions(self):
-        ttk.Label(self.tab_perms, text="Acesso permitido neste workspace",
+        self.ttk.Label(self.tab_perms, text="Acesso permitido neste workspace",
                   font=("Sans", 11, "bold")).pack(anchor="w")
-        ttk.Label(self.tab_perms,
+        self.ttk.Label(self.tab_perms,
                   text="Marque apenas as capacidades necessárias. Escrita e operações em "
                        "aplicativos ainda exigem aprovação na janela Solo-MCP.",
                   wraplength=610).pack(anchor="w", pady=(6, 10))
@@ -271,7 +271,7 @@ class ManagerWindow:
             self.permission_vars[key] = var
             self.ttk.Checkbutton(self.tab_perms, text=LABELS[key], variable=var).pack(
                 anchor="w", pady=4)
-        ttk.Label(self.tab_perms,
+        self.ttk.Label(self.tab_perms,
                   text="ATENÇÃO: terminal executa programas com os direitos do usuário Linux. "
                        "Isso não equivale a um ambiente isolado.",
                   wraplength=610, justify="left").pack(anchor="w", pady=(14, 10))
@@ -280,9 +280,9 @@ class ManagerWindow:
         self.save_permissions_button.pack(anchor="w")
 
     def _build_context(self):
-        ttk.Label(self.tab_context, text="Memória local do workspace",
+        self.ttk.Label(self.tab_context, text="Memória local do workspace",
                   font=("Sans", 11, "bold")).pack(anchor="w")
-        ttk.Label(self.tab_context,
+        self.ttk.Label(self.tab_context,
                   text="Markdown privado, até 16 KB. Não coloque senhas nem tokens. "
                        "O conteúdo nunca é enviado ao GitHub sem habilitar o compartilhamento.",
                   wraplength=610).pack(anchor="w", pady=(4, 7))
@@ -310,9 +310,9 @@ class ManagerWindow:
         self.context_location.pack(anchor="w", pady=(8, 0))
 
     def _build_environment(self):
-        ttk.Label(self.tab_environment, text="Execução e desenvolvimento",
+        self.ttk.Label(self.tab_environment, text="Execução e desenvolvimento",
                   font=("Sans", 11, "bold")).pack(anchor="w")
-        ttk.Label(self.tab_environment,
+        self.ttk.Label(self.tab_environment,
                   text="O agente pode usar Podman rootless para pacotes e testes isolados "
                        "quando você permitir a capacidade Ambiente. Nenhum instalador ou "
                        "privilégio administrativo é acionado nesta tela.",
