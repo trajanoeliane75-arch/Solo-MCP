@@ -289,6 +289,6 @@ SOLO_MCP_TASK_V1
 python3 -m unittest discover -s tests -v
 ```
 
-**Licença atual:** [PolyForm Noncommercial 1.0.0](LICENSE). Permite estudo, alterações e redistribuição **para finalidades não comerciais**, preservando créditos. Por restringir uso comercial, o código é **source-available, não open source OSI**. Versões anteriormente publicadas sob MIT mantêm suas concessões: a mudança não revoga permissões anteriores. Consulte [Contribuições](CONTRIBUTING.md) e [Histórico da licença](docs/LICENSE_HISTORY.md).
+**Licença atual:** [PolyForm Noncommercial 1.0.0](LICENSE). Permite estudo, alterações e redistribuição **para finalidades não comerciais**, preservando créditos. Por restringir uso comercial, o código é **source-available, não open source OSI**. Consulte [Contribuições](CONTRIBUTING.md) para participar do projeto.
 
 Projeto experimental: examine o código e as permissões antes de rodá-lo.
