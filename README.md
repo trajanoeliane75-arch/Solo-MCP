@@ -4,6 +4,31 @@ Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python loca
 
 > **Importante:** esta versão **não implementa um servidor MCP nativo**. Usa as APIs oficiais do GitHub como transporte. Não substitui Codex/Work, não aumenta limites da assinatura do ChatGPT e não permite que uma conversa rode autonomamente em segundo plano. A IA precisa poder criar Issues no repositório privado e consultar seus comentários.
 
+## Workspaces persistentes (como áreas de trabalho do Codex)
+
+O Solo-MCP agora separa o **workspace local** (pasta, permissões e contexto)
+dos **repositórios GitHub associados**. Um workspace pode apontar para
+repositórios de contas diferentes como metadados, sem trocar as credenciais
+ou alterar o repositório privado de controle.
+
+```bash
+# Lista os projetos já existentes como workspaces
+python3 solo_mcp.py workspace list
+python3 solo_mcp.py workspace use sumup
+python3 solo_mcp.py workspace status
+
+# Cria contexto Markdown privado para projeto antigo
+python3 solo_mcp.py workspace context init --name sumup
+python3 solo_mcp.py workspace context path --name sumup
+```
+
+O contexto fica no computador e **não é enviado automaticamente ao GitHub**:
+a leitura remota requer `workspace context share --name sumup --on` e
+permissão `read`. Tarefas remotas devem continuar indicando
+`project` ou `workspace` explicitamente.
+
+Instruções completas: **[Workspaces, múltiplos repositórios e contexto persistente](docs/WORKSPACES.md)**.
+
 ## Projetos e ambientes isolados
 
 Agora há permissões locais por projeto (leitura, escrita, terminal, desktop e ambiente) e um ambiente experimental com Podman rootless para dependências. **Projetos cadastrados nas versões anteriores continuam somente com leitura até você conceder direitos explicitamente.** Isso é intencional.
@@ -172,6 +197,8 @@ O agente consulta Issues abertas e, após executar, comenta `SOLO_MCP_RESULT_V1`
 | `file_info` | `path` | Retorna tamanho e SHA-256 de arquivo binário, até 64 MiB |
 | `doc_read` | `path` | Extrai texto de DOCX (python-docx opcional) |
 | `git_status` | nenhum | Executa `git status --short --branch` |
+| `workspace_info` | `workspace` ou `project` | Mostra metadados sem expor o texto de contexto |
+| `workspace_context` | `workspace` ou `project` | Lê contexto Markdown somente se compartilhamento explícito estiver ativado |
 | `run` | `argv`: lista, `timeout`: segundos | Pede aprovação local, sem shell, até 90 s |
 | `write` | `path`, `content`, `expected_sha256` | Pede aprovação; protege contra sobrescrita inesperada |
 | `sandbox_install` | `packages` | Instala bibliotecas Python num volume Podman, sem acesso ao projeto |
