@@ -14,7 +14,7 @@ class DesktopTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.conf = {'control_repo':'owner/private','projects':{'test':{'path':str(self.root)}}}
+        self.conf = {'control_repo':'owner/private','projects':{'test':{'path':str(self.root),'permissions':{'read':True,'write':True,'terminal':True,'desktop':True,'environment':True}}}}
         self.write_task = {'version':1,'project':'test','action':'write','path':'hello.txt',
                            'content':'hello world','expected_sha256':None}
 
