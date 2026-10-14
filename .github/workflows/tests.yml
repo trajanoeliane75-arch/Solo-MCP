@@ -27,9 +27,11 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Install headless desktop display
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb xauth tk
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb xauth tk imagemagick x11-utils
       - name: Smoke test actual Tkinter GUI
         run: xvfb-run -a env SOLO_MCP_GUI_TESTS=1 python -m unittest discover -s tests -p test_manager.py -v
+      - name: Smoke test selected X11 window JPEG
+        run: xvfb-run -a env SOLO_MCP_X11_TESTS=1 python -m unittest discover -s tests -p test_inspect_e2e.py -v
 
   playwright-smoke:
     name: Playwright browser smoke
