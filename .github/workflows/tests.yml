@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile
-        run: python -m compileall -q solo_mcp.py solo_desktop.py solo_manager.py solo_git.py solo_projects.py solo_workspaces.py solo_sandbox.py tests
+        run: python -m compileall -q solo_mcp.py solo_desktop.py solo_manager.py solo_git.py solo_images.py solo_inspect.py solo_projects.py solo_workspaces.py solo_sandbox.py tests
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Install headless desktop display
