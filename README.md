@@ -37,6 +37,30 @@ python3 solo_mcp.py serve --once
 
 O processo permanece em espera **sem imprimir "Tarefas executadas: 0"**. Ao encontrar uma nova tarefa, executa-a e mostra o resultado no terminal. A consulta é feita a cada **10 segundos**, por padrão (configure com `--interval 30`, por exemplo). Use `Ctrl+C` para parar. Não precisa de porta exposta nem tunnel. Isso é *polling* automático, não um webhook ou hot reload do código: tarefas novas são detectadas sem reiniciar o agente, mas atualizações do programa ainda exigem `git pull` e reinicialização.
 
+## Serviço em segundo plano no Linux (systemd --user)
+
+Não precisa manter um terminal aberto. Pare o agente interativo com Ctrl+C, atualize o repositório e, após confirmar que \`gh auth token\` funciona, instale o serviço:
+
+```bash
+python3 solo_mcp.py service install
+python3 solo_mcp.py service status
+python3 solo_mcp.py service logs
+```
+
+O serviço inicia automaticamente ao entrar na sessão Linux e consulta a fila em silêncio a cada 10 segundos, enquanto estiver ativo. Para parar: \`python3 solo_mcp.py service stop\`; reiniciar: \`python3 solo_mcp.py service restart\`; remover apenas o serviço: \`python3 solo_mcp.py service uninstall\`.
+
+**Aprovações em segundo plano:** o serviço **não executa \`run\` ou \`write\` sem confirmação**. Essas Issues permanecem abertas, aguardando revisão. Em qualquer terminal, execute:
+
+```bash
+cd ~/Solo-MCP
+python3 solo_mcp.py pending
+python3 solo_mcp.py approve --issue NUMERO
+```
+
+Veja a operação apresentada e digite \`s\` para autorizar ou \`n\` para rejeitar. Operações de leitura e diagnóstico continuam automáticas. Não rode o serviço e outro \`serve\` simultaneamente; no estado atual, execução concorrente não tem garantia de exclusão mútua.
+
+Serviços \`systemd --user\` são executados na sessão do usuário, **não como root**. Fora da sessão, a inicialização após desligar/logoff depende da configuração de *linger* do Linux; não ativamos isso automaticamente. Se o serviço falhar por não encontrar credenciais, verifique \`gh auth token\` e os logs. O serviço não consegue pedir \`S/N\` em segundo plano, por isso delegamos essas aprovações ao CLI.
+
 ## Enviar uma tarefa pelo ChatGPT
 
 Peça ao ChatGPT para criar uma Issue no seu repositório **privado** com este corpo exato (a primeira linha é o marcador):
