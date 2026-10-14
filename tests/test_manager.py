@@ -131,13 +131,39 @@ class ManagerBackendTests(unittest.TestCase):
         self.assertEqual((self.project / "original.txt").read_text(encoding="utf-8"), "not deleted")
 
     def test_environment_checks_are_read_only(self):
-        completed = subprocess.CompletedProcess([], 0, "active\n", "")
-        with patch.object(manager.subprocess, "run", return_value=completed) as run:
+        responses = [
+            subprocess.CompletedProcess([], 0, "active\n", ""),
+            subprocess.CompletedProcess([], 0, "true\n", ""),
+            subprocess.CompletedProcess([], 0, "", ""),
+        ]
+        with patch.object(manager.subprocess, "run", side_effect=responses) as run:
             result = self.backend.system_checks()
-        self.assertIn("Serviço: active", result)
-        self.assertIn("Podman: active", result)
-        self.assertEqual(run.call_count, 2)
+        self.assertIn("Serviço Solo-MCP: ativo", result)
+        self.assertIn("Podman: instalado e funcionando sem root", result)
+        self.assertIn("Imagem Python 3.12: pronta", result)
+        self.assertEqual(run.call_count, 3)
         self.assertFalse(any("install" in call.args[0] for call in run.call_args_list))
+        self.assertFalse(any("pull" in call.args[0] for call in run.call_args_list))
+
+    def test_missing_podman_has_clear_explanation(self):
+        def fake_run(argv, **_kwargs):
+            if argv[0] == "podman":
+                raise FileNotFoundError("podman")
+            return subprocess.CompletedProcess(argv, 0, "active\n", "")
+        with patch.object(manager.subprocess, "run", side_effect=fake_run) as run:
+            result = self.backend.system_checks()
+        self.assertIn("Podman: não instalado", result)
+        self.assertIn("bibliotecas do Python principal", result)
+        self.assertIn("leitura dos seus workspaces continua funcionando", result)
+        self.assertFalse(any("sudo" in call.args[0] for call in run.call_args_list))
+
+    def test_manager_git_info_checks_local_selected_folder(self):
+        with patch.object(manager.solo_git, "inspect_local_git",
+                          return_value={"is_repo":False}) as git:
+            result = self.backend.git_info("test")
+        self.assertFalse(result["is_repo"])
+        git.assert_called_once_with(str(self.project))
+
 
     def test_approval_panel_launches_manager_process(self):
         panel = desktop.Panel.__new__(desktop.Panel)
@@ -165,6 +191,21 @@ class ManagerBackendTests(unittest.TestCase):
             self.assertEqual(ui.permission_vars["read"].get(), True)
             self.assertEqual(ui.permission_vars["terminal"].get(), False)
             self.assertEqual(ui.heading.cget("text"), "test")
+
+            ui._render_git_status({
+                "is_repo": True, "root": str(self.project),
+                "branch": "main", "changed": 2, "untracked": 1,
+                "remote_name": "origin", "github_name": "example/test",
+                "github_url": "https://github.com/example/test"
+            })
+            self.assertEqual(ui.open_github_button.cget("state"), "normal")
+            self.assertIn("Branch: main", ui.git_text.get("1.0", "end"))
+            with patch.object(manager.webbrowser, "open") as open_url:
+                ui.open_github()
+            open_url.assert_called_once_with("https://github.com/example/test")
+            ui._render_git_status({"is_repo": False, "message": "Sem Git"})
+            self.assertEqual(ui.open_github_button.cget("state"), "disabled")
+
 
             # Exercise actual GUI callbacks with dialogs stubbed, not just construction.
             ui.permission_vars["desktop"].set(True)
