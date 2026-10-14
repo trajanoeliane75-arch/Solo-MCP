@@ -19,6 +19,7 @@ import urllib.request
 import zipfile
 
 import solo_projects
+import solo_workspaces
 
 CONFIG_PATH = Path.home() / '.config' / 'solo-mcp' / 'config.json'
 SERVICE_FILE = Path.home() / '.config' / 'systemd' / 'user' / 'solo-mcp.service'
@@ -140,8 +141,14 @@ def do_task(config, task, approval_callback=None):
     if not isinstance(task, dict) or task.get('version') != 1:
         raise ValueError('Formato de tarefa inválido')
     action = task.get('action')
-    solo_projects.check_permission(config, task.get('project'), action)
-    root = resolve_project(config, task.get('project'))
+    workspace_name = solo_workspaces.choose_workspace(task)
+    solo_projects.check_permission(config, workspace_name, action)
+    root = resolve_project(config, workspace_name)
+    if action == 'workspace_info':
+        return solo_workspaces.workspace_info(config, workspace_name)
+    if action == 'workspace_context':
+        content = solo_workspaces.read_context(config, workspace_name, remote=True)
+        return {'workspace': workspace_name, 'content': content, 'bytes': len(content.encode('utf-8'))}
     if action == 'list':
         path = safe_path(root, task.get('path', '.'))
         if not path.is_dir():
@@ -332,7 +339,7 @@ def do_task(config, task, approval_callback=None):
     if action == 'sandbox_install':
         from solo_sandbox import build_install_command, run_sandbox
         packages = task.get('packages')
-        command = build_install_command(task['project'], root, packages)
+        command = build_install_command(workspace_name, root, packages)
         preview = ('Instalar dependências APENAS em volume isolado do Podman com rede ativa.\n'
                    'Nenhum arquivo do projeto será montado neste contêiner.\n'
                    'Pacotes: ' + json.dumps(packages, ensure_ascii=False))
@@ -341,7 +348,7 @@ def do_task(config, task, approval_callback=None):
         return run_sandbox(command, task.get('timeout', 180))
     if action == 'sandbox_run':
         from solo_sandbox import build_run_command, run_sandbox
-        command = build_run_command(task['project'], root, task.get('argv'))
+        command = build_run_command(workspace_name, root, task.get('argv'))
         preview = ('Executar código dentro do Podman SEM rede.\n'
                    'Projeto montado somente para leitura; dependências em volume somente leitura.\n'
                    'Comando: ' + json.dumps(task['argv'], ensure_ascii=False))
@@ -386,7 +393,7 @@ def process_once(config, gh, background=False, issue_number=None, sensitive_only
         if any(c.get('body', '').startswith(RESULT_MARKER) for c in previous):
             gh.request('PATCH', path, {'state': 'closed'})
             continue
-        print(f'[TASK #{number}] {task.get("project")} / {task.get("action")}')
+        print(f'[TASK #{number}] {(task.get("workspace") or task.get("project"))} / {task.get("action")}')
         try:
             result = {'ok': True, 'result': do_task(config, task)}
         except Exception as exc:
@@ -525,7 +532,7 @@ def pending_tasks(config, gh):
             continue
         task = parse_task(issue.get('body', ''))
         if task and task.get('action') in MUTATING_ACTIONS:
-            pending.append((int(issue['number']), str(task.get('project')), task['action']))
+            pending.append((int(issue['number']), str(task.get('workspace') or task.get('project')), task['action']))
     return sorted(pending)
 
 
@@ -539,6 +546,38 @@ def cli():
     add.add_argument('--path', required=True)
     add.add_argument('--repo', default='')
     add.add_argument('--replace', action='store_true', help='Substituir cadastro existente, preservando permissões')
+    workspace = sub.add_parser('workspace', help='Workspaces: pastas, contexto e repositórios associados')
+    ws_sub = workspace.add_subparsers(dest='ws_command', required=True)
+    ws_create = ws_sub.add_parser('create', help='Criar workspace e contexto privado inicial')
+    ws_create.add_argument('--name', required=True)
+    ws_create.add_argument('--path', required=True)
+    ws_create.add_argument('--repo', default='')
+    ws_sub.add_parser('list', help='Listar workspaces e workspace selecionado')
+    ws_use = ws_sub.add_parser('use', help='Definir workspace ativo somente no CLI local')
+    ws_use.add_argument('name')
+    ws_status = ws_sub.add_parser('status', help='Mostrar pasta, permissões e repositórios associados')
+    ws_status.add_argument('--name')
+    ws_link = ws_sub.add_parser('link-repo', help='Associar GitHub de qualquer conta (somente metadados)')
+    ws_link.add_argument('--name', required=True)
+    ws_link.add_argument('--repo', required=True)
+    ws_link.add_argument('--account', default='', help='Alias local da conta, não credenciais')
+    ws_unlink = ws_sub.add_parser('unlink-repo', help='Desassociar GitHub sem apagar arquivos')
+    ws_unlink.add_argument('--name', required=True)
+    ws_unlink.add_argument('--repo', required=True)
+    ws_unlink.add_argument('--account', default='')
+    ws_context = ws_sub.add_parser('context', help='Contexto Markdown privado do workspace')
+    context_sub = ws_context.add_subparsers(dest='context_command', required=True)
+    for command in ('init', 'show', 'path'):
+        parser = context_sub.add_parser(command)
+        parser.add_argument('--name')
+    ctx_set = context_sub.add_parser('set', help='Importar Markdown local (máx. 16 KB)')
+    ctx_set.add_argument('--name')
+    ctx_set.add_argument('--file', required=True)
+    ctx_share = context_sub.add_parser('share', help='Opt-in de envio de contexto ao canal GitHub privado')
+    ctx_share.add_argument('--name')
+    share_flags = ctx_share.add_mutually_exclusive_group(required=True)
+    share_flags.add_argument('--on', action='store_true')
+    share_flags.add_argument('--off', action='store_true')
     sub.add_parser('projects', help='Listar projetos e permissões efetivas')
     sub.add_parser('sandbox-check', help='Verificar disponibilidade de Podman rootless e imagem Python')
     setp = sub.add_parser('set-permissions', help='Substituir permissões de projeto')
@@ -573,6 +612,64 @@ def cli():
         save_config(conf)
         print(f"Projeto {args.name} registrado: {entry['path']}")
         print('Permissões iniciais: somente leitura. Edite com set-permissions quando necessário.')
+    elif args.command == 'workspace':
+        conf = load_config()
+        try:
+            if args.ws_command == 'create':
+                entry = solo_projects.register_project(conf, args.name, args.path, args.repo)
+                context = solo_workspaces.init_context(conf, args.name)
+                save_config(conf)
+                print(f"Workspace criado: {args.name} -> {entry['path']}")
+                print('Contexto privado:', context)
+                print('Permissões iniciais: somente leitura.')
+            elif args.ws_command == 'list':
+                selected = solo_workspaces.active_workspace(conf)
+                for name, entry in sorted(conf.get('projects', {}).items()):
+                    marker = '*' if name == selected else ' '
+                    print(f"{marker} {name}: {entry['path']} | repos={len(solo_workspaces.repository_links(conf, name))}")
+                if not conf.get('projects'):
+                    print('Nenhum workspace cadastrado.')
+            elif args.ws_command == 'use':
+                solo_workspaces.select_active(conf, args.name)
+                save_config(conf)
+                print(f'Workspace ativo no CLI local: {args.name}')
+                print('As tarefas recebidas pela rede ainda precisam identificar project ou workspace.')
+            elif args.ws_command == 'status':
+                name = args.name or solo_workspaces.active_workspace(conf)
+                if name is None:
+                    raise ValueError('Informe --name ou use workspace use NOME')
+                print(json.dumps(solo_workspaces.workspace_info(conf, name),
+                                 ensure_ascii=False, indent=2))
+            elif args.ws_command == 'link-repo':
+                link = solo_workspaces.link_repository(conf, args.name, args.repo, args.account)
+                save_config(conf)
+                print('Repositório associado (sem alterar autenticação GitHub):', link)
+            elif args.ws_command == 'unlink-repo':
+                solo_workspaces.unlink_repository(conf, args.name, args.repo, args.account)
+                save_config(conf)
+                print('Associação removida; repositório e arquivos não foram alterados.')
+            elif args.ws_command == 'context':
+                name = args.name or solo_workspaces.active_workspace(conf)
+                if name is None:
+                    raise ValueError('Informe --name ou use workspace use NOME')
+                if args.context_command == 'init':
+                    print('Contexto criado:', solo_workspaces.init_context(conf, name))
+                elif args.context_command == 'path':
+                    solo_workspaces.entry_for(conf, name)
+                    print(solo_workspaces.context_path(name))
+                elif args.context_command == 'show':
+                    print(solo_workspaces.read_context(conf, name))
+                elif args.context_command == 'set':
+                    print('Contexto atualizado:', solo_workspaces.replace_context(conf, name, args.file))
+                elif args.context_command == 'share':
+                    enabled = solo_workspaces.set_context_sharing(conf, name, args.on)
+                    save_config(conf)
+                    print('Compartilhamento remoto do contexto:',
+                          'ATIVADO (via Issues privadas)' if enabled else 'desativado')
+                    if enabled:
+                        print('ATENÇÃO: o conteúdo pode ser incluído nos resultados de Issues privadas.')
+        except (ValueError, OSError, PermissionError, UnicodeError) as exc:
+            ap.error(str(exc))
     elif args.command == 'projects':
         conf = load_config()
         projects = conf.get('projects', {})
