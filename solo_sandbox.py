@@ -83,7 +83,7 @@ def build_install_command(project_name, root, packages):
         base_argv() +
         ["--mount=type=volume,source=" + volume + ",destination=/packages",
          "--workdir=/tmp",
-         "--network=default",
+         # Default rootless networking only for the dependency-fetching phase.
          DEFAULT_IMAGE, "python", "-m", "pip", "install",
          "--disable-pip-version-check", "--only-binary=:all:",
          "--no-cache-dir", "--target=/packages", "--"] +
