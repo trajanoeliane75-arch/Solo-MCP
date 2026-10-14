@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import webbrowser
 import queue
+import shutil
 import subprocess
 import sys
 import threading
@@ -151,6 +152,27 @@ class ManagerBackend:
             "Sem Podman, a leitura dos seus workspaces continua funcionando.",
             "A instalação de pacotes em contêiner depende de Podman disponível.",
             "Ações de instalação/execução ainda exigem autorização do usuário.",
+            "",
+            "INSPEÇÃO VISUAL (com aprovação no painel)",
+        ))
+        from solo_inspect import INSPECT_VENV
+        inspector = INSPECT_VENV / "bin" / "python"
+        report.append(
+            "Playwright: ambiente dedicado encontrado"
+            if inspector.is_file()
+            else "Playwright: ambiente dedicado ainda não preparado"
+        )
+        is_x11 = bool(__import__("os").environ.get("DISPLAY")) and (
+            __import__("os").environ.get("XDG_SESSION_TYPE", "x11").lower() != "wayland"
+        )
+        has_capture_tools = bool(shutil.which("xwininfo") and shutil.which("import"))
+        report.append(
+            "Captura de janela Linux: ferramentas X11 detectadas"
+            if is_x11 and has_capture_tools
+            else "Captura de janela Linux: requer X11, xwininfo e ImageMagick"
+        )
+        report.extend((
+            "As ferramentas só capturam imagens após uma autorização local.",
             "Esta tela apenas verifica; não instala nem concede privilégios.",
         ))
         return "\n".join(report)
@@ -452,9 +474,9 @@ class ManagerWindow:
         self.ttk.Label(self.tab_environment, text="Execução e desenvolvimento",
                   font=("Sans", 11, "bold")).pack(anchor="w")
         self.ttk.Label(self.tab_environment,
-                  text="Podman executa ambientes separados para instalar bibliotecas Python "
-                       "e testar códigos. Sem ele, as ferramentas de leitura continuam funcionando. "
-                       "Esta aba mostra os requisitos; não instala programas no seu Linux.",
+                  text="Podman executa Python em contêineres isolados. Playwright inspeciona "
+                       "páginas web locais; X11 permite capturar janelas do Linux. "
+                       "Esta aba verifica requisitos sem instalar programas no computador.",
                   wraplength=610).pack(anchor="w", pady=(6, 10))
         self.check_button = self.ttk.Button(
             self.tab_environment, text="Verificar serviço e Podman", command=self.check_environment)
