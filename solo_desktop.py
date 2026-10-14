@@ -97,6 +97,7 @@ class Panel:
         self.entries=[]
         self.busy=False
         self.seen=set()
+        self.manager_process=None
         root.title('Solo-MCP - Aprovações')
         width,height=460,440
         root.geometry(f'{width}x{height}+{max(0,root.winfo_screenwidth()-width-25)}+40')
@@ -126,6 +127,7 @@ class Panel:
         self.deny=ttk.Button(bar,text='Recusar',command=lambda:self.choose(False))
         self.deny.pack(side='left',padx=8)
         ttk.Button(bar,text='Atualizar',command=self.refresh.set).pack(side='right')
+        ttk.Button(bar,text='Gerenciar',command=self.open_manager).pack(side='right',padx=8)
         self.set_preview('Aguardando solicitações...')
         self.update_buttons()
         threading.Thread(target=self.poll,daemon=True).start()
@@ -213,6 +215,23 @@ class Panel:
                 raise RuntimeError('Reinicie o painel: repositório de controle alterado')
             self.events.put(('done',decide(current,self.gh,number,digest,allow)))
         except Exception as exc:self.events.put(('done',exc))
+
+    def open_manager(self):
+        """Open the main settings window without stopping the approval panel."""
+        from tkinter import messagebox
+        if self.manager_process is not None and self.manager_process.poll() is None:
+            messagebox.showinfo('Solo-MCP', 'A janela de gerenciamento já está aberta.',
+                                parent=self.root)
+            return
+        try:
+            script=Path(__file__).resolve().with_name('solo_mcp.py')
+            self.manager_process=subprocess.Popen(
+                [sys.executable,str(script),'manager'],
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+                start_new_session=True)
+        except OSError as exc:
+            messagebox.showerror('Solo-MCP','Não foi possível abrir o gerenciador: '+str(exc),
+                                 parent=self.root)
 
     def close(self):
         self.stop.set()
