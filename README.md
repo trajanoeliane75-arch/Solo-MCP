@@ -4,6 +4,25 @@ Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python loca
 
 > **Importante:** esta versão **não implementa um servidor MCP nativo**. Usa as APIs oficiais do GitHub como transporte. Não substitui Codex/Work, não aumenta limites da assinatura do ChatGPT e não permite que uma conversa rode autonomamente em segundo plano. A IA precisa poder criar Issues no repositório privado e consultar seus comentários.
 
+## Integração Git local e ambientes Python
+
+A aba **Repositórios** consulta automaticamente o Git **da pasta local real**
+do workspace. Mostra branch, arquivos alterados, arquivos não rastreados e
+remoto. Quando encontra um remoto GitHub válido, oferece
+**Abrir repositório no GitHub**. A verificação é somente leitura: **não**
+faz login, clone, fetch, pull ou push.
+
+As referências adicionadas manualmente são rotuladas explicitamente
+como **anotações**, não como conexões. Credenciais embutidas nas URLs de
+remotos não são mostradas nem incluídas no link do navegador.
+
+A aba **Ambiente** permanece: o Podman permite isolar a execução de
+Python e o uso de bibliotecas em contêineres. Sem Podman instalado,
+a leitura de projetos e as funções Git continuam operacionais.
+A aba detecta o estado e explica o requisito; não instala programas.
+
+**[Guia: Git local, Podman e ambientes Python](docs/GIT_AND_PYTHON.md)**.
+
 ## Gerenciamento pela interface gráfica
 
 A janela principal já permite **criar workspaces por seletor de pasta**,
