@@ -14,6 +14,7 @@ import sys
 import threading
 
 import solo_git
+import solo_kit
 import solo_mcp as sm
 import solo_projects as projects
 import solo_workspaces as workspaces
@@ -39,6 +40,15 @@ class ManagerBackend:
 
     def details(self, name):
         return workspaces.workspace_info(self.load(), name)
+
+    def kit_status(self):
+        return solo_kit.status()
+
+    def prepare_kit(self, progress, repair=False):
+        return solo_kit.prepare(progress, repair=repair)
+
+    def prepare_native(self, progress):
+        return solo_kit.prepare_native(progress)
 
     def git_info(self, name):
         detail = self.details(name)
@@ -156,25 +166,18 @@ class ManagerBackend:
             "",
             "INSPEÇÃO VISUAL (com aprovação no painel)",
         ))
-        from solo_inspect import INSPECT_VENV
-        inspector = INSPECT_VENV / "bin" / "python"
+        kit = self.kit_status()
         report.append(
-            "Playwright: ambiente dedicado encontrado"
-            if inspector.is_file()
-            else "Playwright: ambiente dedicado ainda não preparado"
+            "Kit essencial Solo-MCP: PRONTO (Playwright "
+            + kit["playwright_version"] + " e Chromium)"
+            if kit["ready"] else
+            "Kit essencial Solo-MCP: PENDENTE (clique em Preparar / reparar kit)"
         )
-        is_x11 = bool(os.environ.get("DISPLAY")) and (
-            os.environ.get("XDG_SESSION_TYPE", "x11").lower() != "wayland"
-        )
-        has_capture_tools = bool(shutil.which("xwininfo") and shutil.which("import"))
-        report.append(
-            "Captura de janela Linux: ferramentas X11 detectadas"
-            if is_x11 and has_capture_tools
-            else "Captura de janela Linux: requer X11, xwininfo e ImageMagick"
-        )
+        report.append("Captura de janela Linux: " + kit["native"])
         report.extend((
             "As ferramentas só capturam imagens após uma autorização local.",
-            "Esta tela apenas verifica; não instala nem concede privilégios.",
+            "Preparação do kit interno: confirme antes de baixar programas.",
+            "Pacotes do Linux exigem confirmação e autenticação próprias.",
         ))
         return "\n".join(report)
 
@@ -212,6 +215,7 @@ class ManagerWindow:
         self._selected_permissions = {}
         self._last_permissions = {}
         self._events = queue.Queue()
+        self.kit_busy = False
         root.title("Solo-MCP · Gerenciar workspaces")
         root.geometry("1060x670")
         root.minsize(850, 550)
@@ -280,6 +284,7 @@ class ManagerWindow:
         self.status.pack(anchor="w")
         self.refresh()
         root.after(200, self._drain_events)
+        root.after(900, self._offer_kit_setup)
 
     def _build_general(self):
         self.ttk.Label(self.tab_general, text="Pasta local", font=("Sans", 11, "bold")).pack(anchor="w")
@@ -472,22 +477,143 @@ class ManagerWindow:
         self.context_location.pack(anchor="w", pady=(8, 0))
 
     def _build_environment(self):
-        self.ttk.Label(self.tab_environment, text="Execução e desenvolvimento",
-                  font=("Sans", 11, "bold")).pack(anchor="w")
-        self.ttk.Label(self.tab_environment,
-                  text="Podman executa Python em contêineres isolados. Playwright inspeciona "
-                       "páginas web locais; X11 permite capturar janelas do Linux. "
-                       "Esta aba verifica requisitos sem instalar programas no computador.",
-                  wraplength=610).pack(anchor="w", pady=(6, 10))
+        self.ttk.Label(
+            self.tab_environment, text="Kit interno do Solo-MCP",
+            font=("Sans", 11, "bold")
+        ).pack(anchor="w")
+        self.ttk.Label(
+            self.tab_environment,
+            text="O aplicativo prepara seu próprio Playwright e Chromium, "
+                 "sem mexer nas bibliotecas Python dos projetos. "
+                 "A instalação inicial é guiada; não requer comandos pip.",
+            wraplength=610, justify="left"
+        ).pack(anchor="w", pady=(6, 8))
+        bar = self.ttk.Frame(self.tab_environment)
+        bar.pack(fill="x", pady=(0, 9))
+        self.kit_button = self.ttk.Button(
+            bar, text="Preparar / reparar kit", command=self.prepare_kit
+        )
+        self.kit_button.pack(side="left")
+        self.native_button = self.ttk.Button(
+            bar, text="Preparar suporte a janelas X11", command=self.prepare_native
+        )
+        self.native_button.pack(side="left", padx=(8, 0))
+        self.ttk.Label(
+            self.tab_environment, text="Ambientes e diagnósticos",
+            font=("Sans", 11, "bold")
+        ).pack(anchor="w", pady=(6, 3))
+        self.ttk.Label(
+            self.tab_environment,
+            text="Podman é uma ferramenta opcional para executar Python em "
+                 "contêineres separados dos projetos. Não é requisito "
+                 "para o kit interno nem para inspeção web.",
+            wraplength=610
+        ).pack(anchor="w", pady=(2, 8))
         self.check_button = self.ttk.Button(
-            self.tab_environment, text="Verificar serviço e Podman", command=self.check_environment)
+            self.tab_environment, text="Verificar tudo", command=self.check_environment
+        )
         self.check_button.pack(anchor="w")
         self.environment_text = self.tk.Text(
-            self.tab_environment, height=10, wrap="word", state="disabled")
+            self.tab_environment, height=10, wrap="word", state="disabled"
+        )
         self.environment_text.pack(fill="both", expand=True, pady=(10, 0))
-        self._set_environment("Podman cria ambientes separados para bibliotecas Python.\n"
-                              "Clique em Verificar para consultar o serviço e os requisitos.\n"
-                              "Contêiner não equivale a uma máquina virtual de segurança.")
+        kit = self.backend.kit_status()
+        self._set_environment(
+            "Kit essencial: " + ("PRONTO" if kit["ready"] else "PENDENTE") + "\n"
+            "O kit é separado das dependências de cada workspace.\n"
+            "Clique em Verificar tudo para consultar os outros componentes."
+        )
+
+    def _offer_kit_setup(self):
+        """Ask only on first start; no background download without consent."""
+        from tkinter import messagebox
+        if self.kit_busy or self.backend.kit_status()["ready"]:
+            return
+        if solo_kit.deferred_setup():
+            return
+        allow = messagebox.askyesno(
+            "Preparar kit essencial",
+            "O Solo-MCP precisa instalar suas ferramentas internas de inspeção "
+            "(Playwright e Chromium) para funcionar sem configuração manual.\n\n"
+            "Isso baixará bibliotecas e navegador para uma pasta privada do "
+            "próprio Solo-MCP, sem alterar o Python dos seus projetos.\n\n"
+            "Preparar agora?",
+            parent=self.root
+        )
+        if allow:
+            self.prepare_kit(confirm=False)
+        else:
+            solo_kit.defer_setup()
+
+    def prepare_kit(self, confirm=True):
+        from tkinter import messagebox
+        if self.kit_busy:
+            return
+        if confirm and not messagebox.askyesno(
+            "Preparar / reparar kit",
+            "Baixar e configurar Playwright e Chromium no kit interno privado "
+            "do Solo-MCP? O processo poderá consumir centenas de MB e "
+            "necessita conexão com a internet.\n\n"
+            "Nenhuma dependência de workspace será modificada.",
+            parent=self.root
+        ):
+            return
+        self.kit_busy = True
+        self.kit_button.configure(state="disabled")
+        self.native_button.configure(state="disabled")
+        self._set_environment("Preparando ferramentas essenciais...")
+        def worker():
+            try:
+                info = self.backend.prepare_kit(
+                    lambda line: self._events.put(("kit_progress", None, line)),
+                    repair=confirm
+                )
+                self._events.put(("kit_done", None, (True, info)))
+            except Exception as exc:
+                self._events.put(("kit_done", None, (False, str(exc))))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def prepare_native(self, confirm=True):
+        from tkinter import messagebox
+        if self.kit_busy:
+            return
+        if not solo_kit.native_missing():
+            messagebox.showinfo(
+                "Solo-MCP", "As ferramentas nativas já estão disponíveis.",
+                parent=self.root
+            )
+            return
+        plan = solo_kit.system_package_plan()
+        if plan is None:
+            messagebox.showwarning(
+                "Solo-MCP",
+                "A instalação automática de ferramentas X11 requer "
+                "Linux Debian/Ubuntu com apt-get e pkexec. "
+                "O Playwright continua disponível sem essas ferramentas.",
+                parent=self.root
+            )
+            return
+        if confirm and not messagebox.askyesno(
+            "Instalação de componentes do Linux",
+            "Instalar x11-utils e ImageMagick pela distribuição?\n\n"
+            "Isso exige autenticação administrativa do Linux "
+            "e altera pacotes do sistema. Não será feito silenciosamente.",
+            parent=self.root
+        ):
+            return
+        self.kit_busy = True
+        self.kit_button.configure(state="disabled")
+        self.native_button.configure(state="disabled")
+        self._set_environment("Aguardando autorização administrativa do Linux...")
+        def worker():
+            try:
+                data = self.backend.prepare_native(
+                    lambda msg: self._events.put(("kit_progress", None, msg))
+                )
+                self._events.put(("native_done", None, (True, data)))
+            except Exception as exc:
+                self._events.put(("native_done", None, (False, str(exc))))
+        threading.Thread(target=worker, daemon=True).start()
 
     def _set_environment(self, content):
         self.environment_text.config(state="normal")
@@ -781,6 +907,7 @@ class ManagerWindow:
         threading.Thread(target=work, daemon=True).start()
 
     def _drain_events(self):
+        from tkinter import messagebox
         while True:
             try:
                 kind, name, result = self._events.get_nowait()
@@ -792,5 +919,37 @@ class ManagerWindow:
             elif kind == "git" and name == self.current:
                 self._render_git_status(result)
                 self.check_git_button.configure(state="normal")
+            elif kind == "kit_progress":
+                self._set_environment(result)
+            elif kind in ("kit_done", "native_done"):
+                self.kit_busy = False
+                self.kit_button.configure(state="normal")
+                self.native_button.configure(state="normal")
+                success, detail = result
+                if not success:
+                    messagebox.showerror(
+                        "Preparação do Solo-MCP", str(detail), parent=self.root
+                    )
+                elif kind == "kit_done":
+                    messagebox.showinfo(
+                        "Solo-MCP", "Kit interno pronto: Playwright e Chromium.",
+                        parent=self.root
+                    )
+                    if solo_kit.native_missing() and solo_kit.system_package_plan():
+                        if messagebox.askyesno(
+                            "Suporte a janelas Linux",
+                            "O kit web está pronto. Deseja preparar também as "
+                            "ferramentas necessárias para capturar janelas X11?\n\n"
+                            "Será solicitada autorização administrativa do Linux.",
+                            parent=self.root
+                        ):
+                            self.prepare_native(confirm=False)
+                else:
+                    messagebox.showinfo(
+                        "Solo-MCP", "Ferramentas de janelas X11 preparadas.",
+                        parent=self.root
+                    )
+                if not self.kit_busy:
+                    self.check_environment()
         if self.root.winfo_exists():
             self.root.after(200, self._drain_events)
