@@ -97,7 +97,9 @@ def inspect_web(url):
     """Run Playwright only in the dedicated Solo-MCP kit interpreter."""
     validate_target({"mode": "web", "url": url})
     worker_python = INSPECT_VENV / "bin" / "python"
-    if Path(sys.executable).resolve() != worker_python.resolve():
+    # sys.executable inside venv may be a symlink to the host interpreter.
+    # sys.prefix identifies the active environment instead of that symlink.
+    if Path(sys.prefix).resolve() != INSPECT_VENV.resolve():
         if not worker_python.is_file():
             raise RuntimeError(
                 "Kit essencial não preparado. Abra Gerenciar > Ambiente e "
