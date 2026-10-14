@@ -141,17 +141,33 @@ class InspectTests(unittest.TestCase):
     def test_picks_x11_window_interactively_not_arbitrary_remote_id(self):
         picker = subprocess.CompletedProcess([],0,
                                              "xwininfo: Window id: 0x2c0000b \"App\"\n","")
+        rootinfo = subprocess.CompletedProcess([] ,0,
+                                                "xwininfo: Window id: 0x1 (root)\n","")
         shot = subprocess.CompletedProcess([],0,JPEG,b"")
         with patch.dict(os.environ, {"DISPLAY":":0","XDG_SESSION_TYPE":"x11"}), \
              patch.object(inspect.shutil, "which", return_value="/usr/bin/bin"), \
-             patch.object(inspect.subprocess, "run", side_effect=[picker,shot]) as runner:
+             patch.object(inspect.subprocess, "run",
+                          side_effect=[picker,rootinfo,shot]) as runner:
             result=inspect.inspect_window()
         self.assertEqual(result["mode"],"window")
-        self.assertEqual(runner.call_count,2)
+        self.assertEqual(runner.call_count,3)
         self.assertEqual(runner.call_args_list[0].args[0],["xwininfo"])
-        self.assertEqual(runner.call_args_list[1].args[0][:3],
+        self.assertEqual(runner.call_args_list[1].args[0],["xwininfo","-root"])
+        self.assertEqual(runner.call_args_list[2].args[0][:3],
                          ["import","-window","0x2c0000b"])
         self.assertEqual(base64.b64decode(result["_image_b64"]),JPEG)
+
+    def test_root_desktop_window_is_never_captured(self):
+        desktop_window = subprocess.CompletedProcess([] ,0,
+                           "xwininfo: Window id: 0x1 (the root window)\n", "")
+        with patch.dict(os.environ, {"DISPLAY":":0","XDG_SESSION_TYPE":"x11"}), \
+             patch.object(inspect.shutil,"which",return_value="/usr/bin/bin"), \
+             patch.object(inspect.subprocess,"run",
+                          side_effect=[desktop_window,desktop_window]) as runner:
+            with self.assertRaisesRegex(RuntimeError,"área de trabalho inteira bloqueada"):
+                inspect.inspect_window()
+        self.assertEqual(runner.call_count,2)
+        self.assertFalse(any("import" in call.args[0] for call in runner.call_args_list))
 
     def test_wayland_safely_refused_without_full_desktop(self):
         with patch.dict(os.environ, {"DISPLAY":":0","XDG_SESSION_TYPE":"wayland"}), \
