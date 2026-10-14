@@ -11,6 +11,8 @@ ACTION_CAPABILITIES = {
     "list": ("read",),
     "read": ("read",),
     "archive_list": ("read",),
+    "file_info": ("read",),
+    "doc_read": ("read",),
     "git_status": ("read",),
     "write": ("write",),
     "doc_create": ("write",),
