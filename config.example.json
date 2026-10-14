@@ -1,0 +1,9 @@
+{
+  "control_repo": "SEU_USUARIO/solo-mcp-control-privado",
+  "projects": {
+    "sumup": {
+      "path": "/home/usuario/projetos/sumup-solo-lab",
+      "github": "trajanoeliane75-arch/sumup-solo-lab"
+    }
+  }
+}
