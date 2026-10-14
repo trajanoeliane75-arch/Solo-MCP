@@ -50,6 +50,9 @@ class ManagerBackend:
     def prepare_native(self, progress):
         return solo_kit.prepare_native(progress)
 
+    def prepare_system_python(self, progress):
+        return solo_kit.prepare_system_python(progress)
+
     def git_info(self, name):
         detail = self.details(name)
         return solo_git.inspect_local_git(detail["root"])
@@ -615,6 +618,40 @@ class ManagerWindow:
                 self._events.put(("native_done", None, (False, str(exc))))
         threading.Thread(target=worker, daemon=True).start()
 
+    def prepare_system_python(self):
+        """Second, explicit OS-level authorization, never a remote task."""
+        from tkinter import messagebox
+        if self.kit_busy:
+            return
+        if not solo_kit.system_python_plan():
+            messagebox.showerror(
+                "Solo-MCP",
+                "A instalação guiada de python3-venv não é suportada "
+                "nesta distribuição.",
+                parent=self.root
+            )
+            return
+        if not messagebox.askyesno(
+            "Componente do sistema Linux",
+            "Para preparar o kit, o Linux precisa fornecer python3-venv.\n\n"
+            "Autorizar sua instalação com apt-get? O Linux pedirá a senha "
+            "administrativa pela janela de autenticação do sistema.",
+            parent=self.root
+        ):
+            return
+        self.kit_busy = True
+        self.kit_button.configure(state="disabled")
+        self.native_button.configure(state="disabled")
+        def worker():
+            try:
+                result = self.backend.prepare_system_python(
+                    lambda line: self._events.put(("kit_progress", None, line))
+                )
+                self._events.put(("python_done", None, (True, result)))
+            except Exception as exc:
+                self._events.put(("python_done", None, (False, str(exc))))
+        threading.Thread(target=worker, daemon=True).start()
+
     def _set_environment(self, content):
         self.environment_text.config(state="normal")
         self.environment_text.delete("1.0", "end")
@@ -921,7 +958,7 @@ class ManagerWindow:
                 self.check_git_button.configure(state="normal")
             elif kind == "kit_progress":
                 self._set_environment(result)
-            elif kind in ("kit_done", "native_done"):
+            elif kind in ("kit_done", "native_done", "python_done"):
                 self.kit_busy = False
                 self.kit_button.configure(state="normal")
                 self.native_button.configure(state="normal")
@@ -930,12 +967,20 @@ class ManagerWindow:
                     messagebox.showerror(
                         "Preparação do Solo-MCP", str(detail), parent=self.root
                     )
+                    if (kind == "kit_done" and "python3-venv" in str(detail)
+                            and solo_kit.system_python_plan()):
+                        self.prepare_system_python()
+                elif kind == "python_done":
+                    # User authorized the OS package and setup can continue
+                    # inside the non-root application-owned environment.
+                    self.prepare_kit(confirm=False)
                 elif kind == "kit_done":
                     messagebox.showinfo(
                         "Solo-MCP", "Kit interno pronto: Playwright e Chromium.",
                         parent=self.root
                     )
-                    if solo_kit.native_missing() and solo_kit.system_package_plan():
+                    if (os.environ.get("DISPLAY") and solo_kit.native_missing()
+                            and solo_kit.system_package_plan()):
                         if messagebox.askyesno(
                             "Suporte a janelas Linux",
                             "O kit web está pronto. Deseja preparar também as "
