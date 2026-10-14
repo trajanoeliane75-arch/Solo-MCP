@@ -250,6 +250,22 @@ def process_once(config, gh):
     return total
 
 
+def serve_tasks(config, gh, once=False, interval=10):
+    """Consulta tarefas continuamente; só imprime quando há trabalho ou erro."""
+    while True:
+        try:
+            total = process_once(config, gh)
+            if total:
+                print(f'Tarefas executadas: {total}', flush=True)
+        except Exception as ex:
+            print('Erro na consulta:', ex, file=sys.stderr, flush=True)
+            if once:
+                raise
+        if once:
+            return
+        time.sleep(max(10, interval))
+
+
 def cli():
     ap = argparse.ArgumentParser(description='Solo-MCP: ponte local via GitHub Issues privadas')
     sub = ap.add_subparsers(dest='command', required=True)
@@ -261,7 +277,7 @@ def cli():
     add.add_argument('--repo', default='')
     run = sub.add_parser('serve', help='Escutar novas tarefas')
     run.add_argument('--once', action='store_true')
-    run.add_argument('--interval', type=int, default=20)
+    run.add_argument('--interval', type=int, default=10)
     args = ap.parse_args()
     if args.command == 'init':
         if CONFIG_PATH.exists():
@@ -281,16 +297,12 @@ def cli():
         gh = Github(gh_token())
         require_private_repo(gh, conf['control_repo'])
         print('Ponte conectada a', conf['control_repo'])
-        while True:
-            try:
-                print('Tarefas executadas:', process_once(conf, gh))
-            except Exception as ex:
-                print('Erro na consulta:', ex, file=sys.stderr)
-                if args.once:
-                    raise
-            if args.once:
-                return
-            time.sleep(max(10, args.interval))
+        if not args.once:
+            print(f'Aguardando tarefas (consulta a cada {max(10, args.interval)}s). Ctrl+C para sair.')
+        try:
+            serve_tasks(conf, gh, once=args.once, interval=args.interval)
+        except KeyboardInterrupt:
+            print('\nPonte encerrada.')
 
 
 if __name__ == '__main__':
