@@ -19,6 +19,7 @@ import urllib.request
 import zipfile
 
 import solo_projects
+import solo_images
 import solo_workspaces
 
 CONFIG_PATH = Path.home() / '.config' / 'solo-mcp' / 'config.json'
@@ -30,7 +31,7 @@ READ_LIMIT = 20000
 OUTPUT_LIMIT = 20000
 BLOCKED_NAMES = {'.env', '.npmrc', '.pypirc', 'id_rsa', 'id_ed25519', 'credentials', 'credentials.json', 'secrets.json', 'known_hosts'}
 BLOCKED_PARTS = {'.ssh', '.gnupg', '.aws', '.git', '.config', '.kube', 'node_modules'}
-MUTATING_ACTIONS = frozenset({'run', 'write', 'open_app', 'open_document', 'web_search', 'doc_create', 'doc_append', 'venv_create', 'sandbox_install', 'sandbox_run'})
+MUTATING_ACTIONS = frozenset({'run', 'write', 'open_app', 'open_document', 'web_search', 'doc_create', 'doc_append', 'venv_create', 'sandbox_install', 'sandbox_run', 'inspect_screen'})
 ALLOWED_TOOLS = {'python', 'python3', 'pytest', 'git', 'javap', 'java', 'jar', 'unzip', 'zipinfo', 'ls', 'find', 'grep', 'rg', 'head', 'tail', 'file', 'stat', 'strings', 'jadx', 'usb-devices', 'lsusb'}
 
 
@@ -208,6 +209,12 @@ def do_task(config, task, approval_callback=None):
         content = '\n'.join(lines)
         return {'path': str(path.relative_to(root)), 'text': content[:READ_LIMIT],
                 'truncated': len(content) > READ_LIMIT or len(document.paragraphs) > 300}
+    if action == 'inspect_screen':
+        from solo_inspect import inspect, describe_target
+        preview = describe_target(task)
+        if not approve(preview, approval_callback):
+            return {'status': 'rejected'}
+        return inspect(task)
     if action == 'git_status':
         run = subprocess.run(['git', '-C', str(root), 'status', '--short', '--branch'], text=True, capture_output=True, timeout=20)
         return {'returncode': run.returncode, 'stdout': run.stdout[:OUTPUT_LIMIT], 'stderr': run.stderr[:OUTPUT_LIMIT]}
@@ -368,6 +375,23 @@ def parse_task(body):
     return task if isinstance(task, dict) and task.get('version') == 1 else None
 
 
+def publish_task_result(gh, issue_path, result):
+    """Post image chunks first, final result marker last, then close the Issue.
+
+    The result returned to the caller is sanitized (no screenshot bytes in GUI
+    popups or ordinary JSON comments).
+    """
+    safe, parts = solo_images.make_chunks(result)
+    for body in parts:
+        gh.request('POST', issue_path + '/comments', {'body': body})
+    body = RESULT_MARKER + '\n```json\n' + json.dumps(
+        safe, ensure_ascii=False, indent=2
+    )[:50000] + '\n```'
+    gh.request('POST', issue_path + '/comments', {'body': body})
+    gh.request('PATCH', issue_path, {'state': 'closed'})
+    return safe
+
+
 def process_once(config, gh, background=False, issue_number=None, sensitive_only=False):
     repo = config['control_repo']
     info = require_private_repo(gh, repo)
@@ -398,9 +422,7 @@ def process_once(config, gh, background=False, issue_number=None, sensitive_only
             result = {'ok': True, 'result': do_task(config, task)}
         except Exception as exc:
             result = {'ok': False, 'error': str(exc)[:800]}
-        body = RESULT_MARKER + '\n```json\n' + json.dumps(result, ensure_ascii=False, indent=2)[:50000] + '\n```'
-        gh.request('POST', path + '/comments', {'body': body})
-        gh.request('PATCH', path, {'state': 'closed'})
+        publish_task_result(gh, path, result)
         total += 1
     return total
 
