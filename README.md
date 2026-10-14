@@ -35,7 +35,7 @@ python3 solo_mcp.py serve
 python3 solo_mcp.py serve --once
 ```
 
-O processo faz consultas periódicas; use `Ctrl+C` para parar. Não precisa de porta exposta nem tunnel.
+O processo permanece em espera **sem imprimir "Tarefas executadas: 0"**. Ao encontrar uma nova tarefa, executa-a e mostra o resultado no terminal. A consulta é feita a cada **10 segundos**, por padrão (configure com `--interval 30`, por exemplo). Use `Ctrl+C` para parar. Não precisa de porta exposta nem tunnel. Isso é *polling* automático, não um webhook ou hot reload do código: tarefas novas são detectadas sem reiniciar o agente, mas atualizações do programa ainda exigem `git pull` e reinicialização.
 
 ## Enviar uma tarefa pelo ChatGPT
 
