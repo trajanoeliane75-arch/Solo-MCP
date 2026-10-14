@@ -148,7 +148,7 @@ class InspectTests(unittest.TestCase):
     def test_description_warns_of_private_github_storage(self):
         self.assertIn("PRIVADO",inspect.describe_target(self.window))
         self.assertIn("PRIVADO",inspect.describe_target(self.web))
-        self.assertIn("NOVA",inspect.describe_target(self.web))
+        self.assertIn("nova sessão",inspect.describe_target(self.web))
 
 
 class ImageTransportTests(unittest.TestCase):
