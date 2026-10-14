@@ -106,6 +106,34 @@ class InspectTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 inspect.validate_target({"mode":"web","url":url})
 
+    def test_worker_isolated_playwright_venv_preserves_desktop_python(self):
+        venv_dir = self.root / "inspect-venv"
+        worker_python = venv_dir / "bin" / "python"
+        worker_python.parent.mkdir(parents=True)
+        worker_python.write_text("dummy", encoding="utf-8")
+        data = inspect.make_image_result(JPEG, "web", {"title":"From venv"})
+        mock = subprocess.CompletedProcess([], 0, json.dumps(data), "")
+        with patch.object(inspect, "INSPECT_VENV", venv_dir), \
+             patch.dict(sys.modules, {"playwright":None, "playwright.sync_api":None}), \
+             patch.dict(os.environ, {"SOLO_MCP_TOKEN":"private","OPENAI_API_KEY":"hidden",
+                                     "AWS_SECRET_ACCESS_KEY":"aws-key"}), \
+             patch.object(inspect.subprocess, "run", return_value=mock) as run:
+            result = inspect.inspect_web("http://127.0.0.1:3000/")
+        self.assertEqual(result["diagnostics"]["title"],"From venv")
+        self.assertEqual(base64.b64decode(result["_image_b64"]),JPEG)
+        self.assertEqual(run.call_args.args[0][0],str(worker_python))
+        self.assertEqual(run.call_args.args[0][-2],"--web-worker")
+        environment = run.call_args.kwargs["env"]
+        self.assertNotIn("SOLO_MCP_TOKEN",environment)
+        self.assertNotIn("OPENAI_API_KEY",environment)
+        self.assertNotIn("AWS_SECRET_ACCESS_KEY",environment)
+
+    def test_missing_playwright_dep_is_explained(self):
+        with patch.object(inspect, "INSPECT_VENV", self.root / "absent"), \
+             patch.dict(sys.modules, {"playwright":None, "playwright.sync_api":None}):
+            with self.assertRaisesRegex(RuntimeError,"Playwright não instalado"):
+                inspect.inspect_web("http://127.0.0.1:3000/")
+
     def test_native_mode_rejects_url(self):
         with self.assertRaises(ValueError):
             inspect.validate_target({"mode":"window","url":"https://example.org"})
