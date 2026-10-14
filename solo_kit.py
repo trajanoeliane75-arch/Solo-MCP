@@ -58,6 +58,17 @@ def browser_env():
     return env
 
 
+def deferred_setup():
+    return (KIT_ROOT / ".onboarding-deferred").exists()
+
+
+def defer_setup():
+    private_directory()
+    marker = KIT_ROOT / ".onboarding-deferred"
+    marker.touch(mode=0o600)
+    marker.chmod(0o600)
+
+
 def _record():
     try:
         value = json.loads(state_path().read_text(encoding="utf-8"))
@@ -200,6 +211,7 @@ def prepare(on_progress=None, *, repair=False):
     )
     _run([str(py), "-c", probe], timeout=50, env=env)
     _write_state()
+    (KIT_ROOT / ".onboarding-deferred").unlink(missing_ok=True)
     notice("Playwright e Chromium prontos no kit privado.")
     return status()
 
