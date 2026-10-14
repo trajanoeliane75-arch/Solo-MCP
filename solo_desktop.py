@@ -207,7 +207,11 @@ class Panel:
         threading.Thread(target=self.act,args=(item['number'],item['digest'],allow),daemon=True).start()
 
     def act(self,number,digest,allow):
-        try:self.events.put(('done',decide(self.config,self.gh,number,digest,allow)))
+        try:
+            current = sm.load_config()
+            if current['control_repo'] != self.config['control_repo']:
+                raise RuntimeError('Reinicie o painel: repositório de controle alterado')
+            self.events.put(('done',decide(current,self.gh,number,digest,allow)))
         except Exception as exc:self.events.put(('done',exc))
 
     def close(self):
