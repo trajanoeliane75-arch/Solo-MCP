@@ -10,7 +10,7 @@ Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python loca
 - Credenciais só no computador: autentique com `gh auth login` ou defina `SOLO_MCP_TOKEN` em variável de ambiente, **nunca** numa Issue, arquivo versionado, print ou chat. No controle, o token necessita acesso a Issues de leitura e escrita.
 - Arquivos locais são restritos aos projetos cadastrados; diretórios de credenciais e `.git` são protegidos. Os arquivos não são enviados automaticamente ao repo público, mas **resultados de leitura aparecem nas Issues privadas**.
 - O agente só aceita Issues abertas com primeira linha `SOLO_MCP_TASK_V1`, criadas pelo **proprietário do repositório de controle**.
-- Ações de terminal e gravação de arquivos requerem confirmação **APROVAR** no terminal do PC. Os comandos são executados sem shell; há lista de programas admitidos, tempo limite e limite de saída.
+- Ações de terminal e gravação de arquivos requerem confirmação local **[s/N]** (`S` ou `s` autoriza, `N`, `n` e Enter cancelam). Os comandos são executados sem shell; há lista de programas admitidos, tempo limite e limite de saída.
 - Não configure `sudo`, não execute o agente como root e não use um repositório de controle compartilhado com usuários não confiáveis.
 
 ## Instalar
