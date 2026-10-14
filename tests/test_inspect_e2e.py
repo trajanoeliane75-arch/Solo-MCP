@@ -60,18 +60,20 @@ class VisualBrowserSmoke(unittest.TestCase):
 @unittest.skipUnless(os.environ.get("SOLO_MCP_X11_TESTS") == "1",
                      "Native X11 smoke requires Xvfb and ImageMagick")
 class NativeWindowSmoke(unittest.TestCase):
-    def test_captures_real_tk_window_with_imagemagick(self):
-        import tkinter as tk
+    def test_captures_real_gtk_window_with_imagemagick(self):
+        import gi
+        gi.require_version("Gtk", "3.0")
+        gi.require_version("GdkX11", "3.0")
+        from gi.repository import Gtk, GdkX11
         import subprocess
         from unittest.mock import patch
-        root=tk.Tk()
+        root=Gtk.Window(title="Solo native capture smoke")
         try:
-            root.title("Solo native capture smoke")
-            root.geometry("370x210+100+100")
-            tk.Label(root, text="Janela de teste Solo-MCP",
-                     font=("Sans", 16, "bold")).pack(pady=35)
-            root.update()
-            window_id=hex(root.winfo_id())
+            root.set_default_size(370,210)
+            root.add(Gtk.Label(label="Janela de teste Solo-MCP"))
+            root.show_all()
+            while Gtk.events_pending(): Gtk.main_iteration()
+            window_id=hex(root.get_window().get_xid())
             original_run=subprocess.run
 
             def picker_then_real(command, **kwargs):

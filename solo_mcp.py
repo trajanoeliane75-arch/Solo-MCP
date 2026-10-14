@@ -418,11 +418,12 @@ def process_once(config, gh, background=False, issue_number=None, sensitive_only
             gh.request('PATCH', path, {'state': 'closed'})
             continue
         print(f'[TASK #{number}] {(task.get("workspace") or task.get("project"))} / {task.get("action")}')
+        import solo_execution
         try:
-            result = {'ok': True, 'result': do_task(config, task)}
-        except Exception as exc:
-            result = {'ok': False, 'error': str(exc)[:800]}
-        publish_task_result(gh, path, result)
+            result = solo_execution.execute(repo,number,task,lambda: {'ok':True,'result':do_task(config,task)})
+        except solo_execution.AlreadyClaimed:
+            continue
+        solo_execution.deliver(gh,repo,number,result,publish_task_result)
         total += 1
     return total
 

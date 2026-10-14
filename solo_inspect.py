@@ -102,8 +102,8 @@ def inspect_web(url):
     if Path(sys.prefix).resolve() != INSPECT_VENV.resolve():
         if not worker_python.is_file():
             raise RuntimeError(
-                "Kit essencial não preparado. Abra Gerenciar > Ambiente e "
-                "escolha Preparar / reparar kit para instalar Playwright e Chromium."
+                "Kit essencial não preparado. Abra Ferramentas e "
+                "escolha Preparar kit para instalar Playwright e Chromium."
             )
         result = subprocess.run(
             [str(worker_python), str(Path(__file__).resolve()), "--web-worker", url],
@@ -112,8 +112,8 @@ def inspect_web(url):
         )
         if result.returncode:
             raise RuntimeError(
-                "Falha no kit de inspeção. Em Gerenciar > Ambiente, clique "
-                "em Preparar / reparar kit."
+                "Falha no kit de inspeção. Em Ferramentas, clique "
+                "em Reparar kit."
             )
         try:
             parsed = json.loads(result.stdout)

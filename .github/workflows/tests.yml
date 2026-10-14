@@ -16,31 +16,31 @@ jobs:
       matrix:
         python-version: ['3.10', '3.12', '3.13']
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile
-        run: python -m compileall -q solo_mcp.py solo_desktop.py solo_manager.py solo_git.py solo_images.py solo_inspect.py solo_kit.py solo_projects.py solo_workspaces.py solo_sandbox.py tests
+        run: python -m compileall -q .
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
-      - name: Install headless desktop display
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb xauth tk imagemagick x11-utils
-      - name: Smoke test actual Tkinter GUI
-        run: xvfb-run -a env SOLO_MCP_GUI_TESTS=1 python -m unittest discover -s tests -p test_manager.py -v
-      - name: Smoke test selected X11 window JPEG
-        run: xvfb-run -a env SOLO_MCP_X11_TESTS=1 python -m unittest discover -s tests -p test_inspect_e2e.py -v
+
+  native-desktop:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the actual desktop runtime
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb xauth python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 imagemagick x11-utils
+      - name: Native WebKit workflow smoke
+        run: xvfb-run -a env SOLO_MCP_GUI_TESTS=1 /usr/bin/python3 -m unittest discover -s tests -p test_ui.py -v
+      - name: Selected GTK window JPEG
+        run: xvfb-run -a env SOLO_MCP_X11_TESTS=1 /usr/bin/python3 -m unittest discover -s tests -p test_inspect_e2e.py -v
 
   playwright-smoke:
-    name: Playwright browser smoke
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install Playwright and Chromium in CI

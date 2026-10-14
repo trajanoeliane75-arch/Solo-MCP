@@ -14,3 +14,13 @@ state.json
 *.zip
 *.jar
 *.aar
+*.bak
+*.bak-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+*.log.*
+.solo-mcp/
+release-worktree*/

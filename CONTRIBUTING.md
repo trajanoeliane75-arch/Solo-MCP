@@ -33,11 +33,5 @@ A licença permite cópia, modificações e distribuição para finalidades
 não comerciais abrangidas por seus termos, **não concede direitos de
 exploração comercial, revenda ou sublicenciamento**.
 
-Importante: versões **anteriores**, publicadas sob MIT, permanecem
-sujeitas às concessões daquela licença. A troca no ramo atual
-não cancela licenças já concedidas nem altera direitos de terceiros
-sobre contribuições independentes.
-
-Para detalhes, leia [LICENSE](LICENSE), os termos oficiais no
-[PolyForm Project](https://polyformproject.org/licenses/noncommercial/1.0.0)
-e [Histórico de licenciamento](docs/LICENSE_HISTORY.md).
+Para condições e obrigações aplicáveis ao código atual, consulte
+[LICENSE](LICENSE), com os termos completos da PolyForm Noncommercial 1.0.0.

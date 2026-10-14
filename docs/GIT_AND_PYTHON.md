@@ -33,7 +33,7 @@ faz login, não clona repositórios de contas diferentes e não instala Git.
 
 ### Teste real sem modificar seu projeto
 
-1. Abra Solo-MCP → **Gerenciar** → workspace `brazil` ou `sumup`.
+1. Abra Solo-MCP → **Workspaces** → workspace `brazil` ou `sumup`.
 2. Acesse **Repositórios**. O estado do Git local deve ser consultado.
 3. Confira a branch e a contagem de alterações.
 4. Se houver remoto GitHub reconhecido, clique em **Abrir repositório no GitHub**.
@@ -46,7 +46,7 @@ acesso aos arquivos daquele workspace.
 
 ## Kit essencial independente dos projetos
 
-O Solo-MCP prepara seu próprio Playwright e Chromium no primeiro uso da interface, com autorização do usuário. O kit fica em `~/.local/share/solo-mcp/kit-v1` e é separado do Python principal e dos ambientes de cada workspace. A aba **Ambiente** permite preparar/reparar o kit e verificar se funciona. Não é preciso conhecer pip ou venv para utilizar as inspeções.
+O Solo-MCP prepara seu próprio Playwright e Chromium no primeiro uso da interface, com autorização do usuário. O kit fica em `~/.local/share/solo-mcp/kit-v1` e é separado do Python principal e dos ambientes de cada workspace. A página **Ferramentas** permite preparar/reparar o kit e verificar se funciona. Não é preciso conhecer pip ou venv para utilizar as inspeções.
 
 O suporte X11 para capturar janelas pode exigir a instalação de pacotes do sistema operacional, com confirmação e autenticação administrativa separadas. [Detalhes da inspeção visual](INSPECTION.md).
 
@@ -68,7 +68,7 @@ Não equivalem a uma máquina virtual nem a uma sandbox impenetrável.
 Python do sistema. Ele é mais simples, mas não restringe o que o código pode
 ler ou modificar no computador como um contêiner.
 
-A aba **Ambiente** mantém a verificação do serviço e agora informa
+A página **Ferramentas** mantém a verificação do serviço e agora informa
 se o Podman está instalado, se roda sem root e se a imagem Python já
 está baixada. Ela **não instala** Podman por conta própria.
 
@@ -85,7 +85,7 @@ sudo apt install podman
 podman pull docker.io/library/python:3.12-slim
 ```
 
-Depois, volte à aba **Ambiente** e clique em **Verificar serviço e Podman**.
+Depois, volte à página **Ferramentas** e clique em **Verificar tudo**.
 O comando `sudo` instala o programa pela distribuição; **não** execute
 o contêiner com `sudo`. Prefira operar com seu usuário normal (rootless).
 

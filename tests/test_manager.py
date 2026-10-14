@@ -1,4 +1,4 @@
-"""Tests for local GUI backend; one optional actual Tk smoke test under Xvfb."""
+"""Regression tests for shared local workspace operations."""
 import copy
 import os
 from pathlib import Path
@@ -165,84 +165,13 @@ class ManagerBackendTests(unittest.TestCase):
         git.assert_called_once_with(str(self.project))
 
 
-    def test_approval_panel_launches_manager_process(self):
-        panel = desktop.Panel.__new__(desktop.Panel)
-        panel.root = Mock()
-        panel.manager_process = None
-        with patch.object(desktop.subprocess, "Popen") as popen:
-            panel.open_manager()
-        argv = popen.call_args.args[0]
-        self.assertEqual(argv[-1], "manager")
-        self.assertTrue(argv[-2].endswith("solo_mcp.py"))
-
-    @unittest.skipUnless(os.environ.get("SOLO_MCP_GUI_TESTS") == "1",
-                         "Smoke test requires xvfb-run and SOLO_MCP_GUI_TESTS=1")
-    def test_actual_tk_manager_renders_workspaces_and_tabs(self):
-        import tkinter as tk
-        from tkinter import ttk
-        root = tk.Tk()
-        try:
-            ui = manager.ManagerWindow(root, tk, ttk, self.backend)
-            root.update_idletasks()
-            self.assertIn("test", ui.tree.get_children())
-            self.assertEqual(ui.current, "test")
-            self.assertEqual(len(ui.tabs.tabs()), 5)
-            self.assertEqual(ui.context_text.get("1.0", "end-1c"), "")
-            self.assertEqual(ui.permission_vars["read"].get(), True)
-            self.assertEqual(ui.permission_vars["terminal"].get(), False)
-            self.assertEqual(ui.heading.cget("text"), "test")
-
-            # First-run onboarding is a real GUI prompt, not an automatic
-            # download or an instruction to run pip manually.
-            with patch.object(self.backend, "kit_status", return_value={"ready":False}), \
-                 patch.object(manager.solo_kit, "deferred_setup", return_value=False), \
-                 patch("tkinter.messagebox.askyesno", return_value=True), \
-                 patch.object(ui, "prepare_kit") as prepare:
-                ui._offer_kit_setup()
-            prepare.assert_called_once_with(confirm=False)
-
-
-            ui._render_git_status({
-                "is_repo": True, "root": str(self.project),
-                "branch": "main", "changed": 2, "untracked": 1,
-                "remote_name": "origin", "github_name": "example/test",
-                "github_url": "https://github.com/example/test"
-            })
-            self.assertTrue(ui.open_github_button.instate(["!disabled"]))
-            self.assertIn("Branch: main", ui.git_text.get("1.0", "end"))
-            with patch.object(manager.webbrowser, "open") as open_url:
-                ui.open_github()
-            open_url.assert_called_once_with("https://github.com/example/test")
-            ui._render_git_status({"is_repo": False, "message": "Sem Git"})
-            self.assertTrue(ui.open_github_button.instate(["disabled"]))
-
-
-            # Exercise actual GUI callbacks with dialogs stubbed, not just construction.
-            ui.permission_vars["desktop"].set(True)
-            with patch("tkinter.messagebox.askyesno", return_value=True):
-                ui.save_permissions()
-            self.assertTrue(self.backend.details("test")["permissions"]["desktop"])
-
-            ui.context_text.insert("1.0", "# Projeto\n\nDecisões.")
-            ui.save_context()
-            self.assertIn("Decisões.", self.backend.read_context("test"))
-
-            ui.share_var.set(True)
-            with patch("tkinter.messagebox.askyesno", return_value=True):
-                ui.save_sharing()
-            self.assertTrue(self.backend.details("test")["context_shared"])
-
-            new_folder = self.base / "gui-created"
-            new_folder.mkdir()
-            with patch("tkinter.simpledialog.askstring", return_value="novo"), \
-                 patch("tkinter.filedialog.askdirectory", return_value=str(new_folder)):
-                ui.create_dialog()
-            self.assertIn("novo", ui.tree.get_children())
-            self.assertEqual(ui.current, "novo")
-            self.assertFalse(self.backend.details("novo")["permissions"]["terminal"])
-            self.assertEqual(ui.heading.cget("text"), "novo")
-        finally:
-            root.destroy()
+    def test_manager_and_approval_routes_use_unified_native_app(self):
+        with patch("solo_app.main") as main:
+            manager.start_manager()
+            main.assert_called_once_with()
+        with patch("solo_app.main") as main:
+            desktop.start_desktop()
+            main.assert_called_once_with(initial_page="approvals")
 
 
 if __name__ == "__main__":
