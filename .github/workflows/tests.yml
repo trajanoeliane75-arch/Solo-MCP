@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile
-        run: python -m compileall -q solo_mcp.py solo_desktop.py solo_manager.py solo_git.py solo_images.py solo_inspect.py solo_projects.py solo_workspaces.py solo_sandbox.py tests
+        run: python -m compileall -q solo_mcp.py solo_desktop.py solo_manager.py solo_git.py solo_images.py solo_inspect.py solo_kit.py solo_projects.py solo_workspaces.py solo_sandbox.py tests
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Install headless desktop display
@@ -45,7 +45,9 @@ jobs:
           python-version: '3.12'
       - name: Install Playwright and Chromium in CI
         run: |
-          python -m pip install playwright
-          python -m playwright install --with-deps chromium
+          python -m pip install playwright==1.63.0
+          python -m playwright install-deps chromium
+      - name: Prepare Solo-MCP private tool kit
+        run: python -c 'import solo_kit; solo_kit.prepare()'
       - name: Inspect real localhost app
         run: SOLO_MCP_BROWSER_TESTS=1 python -m unittest discover -s tests -p test_inspect_e2e.py -v
