@@ -4,6 +4,7 @@ All mutations update only private local Solo-MCP configuration and context.
 GitHub aliases are metadata; this UI never stores passwords or access tokens.
 """
 import json
+import os
 from pathlib import Path
 import webbrowser
 import queue
@@ -162,8 +163,8 @@ class ManagerBackend:
             if inspector.is_file()
             else "Playwright: ambiente dedicado ainda não preparado"
         )
-        is_x11 = bool(__import__("os").environ.get("DISPLAY")) and (
-            __import__("os").environ.get("XDG_SESSION_TYPE", "x11").lower() != "wayland"
+        is_x11 = bool(os.environ.get("DISPLAY")) and (
+            os.environ.get("XDG_SESSION_TYPE", "x11").lower() != "wayland"
         )
         has_capture_tools = bool(shutil.which("xwininfo") and shutil.which("import"))
         report.append(
