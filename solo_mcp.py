@@ -124,7 +124,10 @@ def safe_path(root, relative, write=False):
 def approve(description):
     print('\n[APROVAÇÃO LOCAL NECESSÁRIA]')
     print(description[:2500])
-    return input('Digite APROVAR para prosseguir: ').strip() == 'APROVAR'
+    response = input('Autorizar esta operação? [s/N]: ').strip().casefold()
+    approved = response == 's'
+    print('Operação autorizada.' if approved else 'Operação cancelada.')
+    return approved
 
 
 def do_task(config, task):
