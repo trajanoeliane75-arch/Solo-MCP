@@ -87,7 +87,7 @@ class NativeWindowSmoke(unittest.TestCase):
                 result=solo_inspect.inspect_window()
             raw=base64.b64decode(result["_image_b64"],validate=True)
             self.assertEqual(result["mode"],"window")
-            self.assertTrue(raw.startswith(b"\\xff\\xd8\\xff"))
+            self.assertTrue(raw.startswith(b"\xff\xd8\xff"))
             self.assertGreater(len(raw),1000)
         finally:
             root.destroy()
