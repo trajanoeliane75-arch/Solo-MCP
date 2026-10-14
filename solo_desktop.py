@@ -54,11 +54,7 @@ def decide(config, gh, number, digest, allow):
             result = {'ok':False,'error':str(exc)[:800]}
     else:
         result = {'ok':True,'result':{'status':'rejected'}}
-    fence = chr(96)*3
-    body = sm.RESULT_MARKER + '\n' + fence+'json\n'+json.dumps(result,ensure_ascii=False,indent=2)[:50000]+'\n'+fence
-    gh.request('POST',issue_path+'/comments',{'body':body})
-    gh.request('PATCH',issue_path,{'state':'closed'})
-    return result
+    return sm.publish_task_result(gh, issue_path, result)
 
 
 def autostart_path():
@@ -202,6 +198,21 @@ class Panel:
         op='Autorizar' if allow else 'Recusar'
         task=item['task']
         description=f"Issue #{item['number']}\nProjeto: {(task.get('workspace') or task.get('project'))}\nAção: {task.get('action')}"
+        if task.get('action') == 'inspect_screen':
+            description += (
+                "\n\nA captura da tela será enviada para o repositório privado "
+                "de controle no GitHub e poderá mostrar dados sensíveis."
+            )
+            if task.get('mode') == 'window':
+                description += (
+                    "\nApós autorizar, clique na janela desejada quando "
+                    "o cursor virar uma cruz."
+                )
+            else:
+                description += (
+                    "\nPlaywright abrirá uma NOVA sessão do Chromium "
+                    "para inspecionar a página local indicada."
+                )
         if not messagebox.askyesno('Solo-MCP',f'{op} esta tarefa?\n\n{description}\nRevise a prévia antes de confirmar.',parent=self.root):
             return
         self.busy=True
