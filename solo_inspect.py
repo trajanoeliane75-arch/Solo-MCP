@@ -82,44 +82,50 @@ def make_image_result(image, mode, diagnostics=None):
 
 
 
-INSPECT_VENV = Path.home() / ".local" / "share" / "solo-mcp" / "inspect-venv"
+import solo_kit
+
+# Shared, app-owned kit: never install Playwright into a workspace or into
+# the Python that runs the Solo-MCP approval panel.
+INSPECT_VENV = solo_kit.KIT_ROOT
 
 
 def sanitized_browser_env():
-    """Do not pass GitHub tokens and unrelated app secrets to browser processes."""
-    deny = ("TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "API_KEY",
-            "GITHUB", "GH_", "AWS_", "SSH_", "SOLO_MCP_", "OPENAI_")
-    return {k: v for k, v in os.environ.items()
-            if not any(term in k.upper() for term in deny)}
+    return solo_kit.browser_env()
 
 
 def inspect_web(url):
-    """New, independent browser session. Only loopback HTTP, including subresources."""
+    """Run Playwright only in the dedicated Solo-MCP kit interpreter."""
     validate_target({"mode": "web", "url": url})
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
-        worker_python = INSPECT_VENV / "bin" / "python"
+    worker_python = INSPECT_VENV / "bin" / "python"
+    if Path(sys.executable).resolve() != worker_python.resolve():
         if not worker_python.is_file():
             raise RuntimeError(
-                "Playwright não instalado. Crie o ambiente opcional inspect-venv "
-                "e instale Playwright + Chromium conforme docs/INSPECTION.md."
-            ) from exc
+                "Kit essencial não preparado. Abra Gerenciar > Ambiente e "
+                "escolha Preparar / reparar kit para instalar Playwright e Chromium."
+            )
         result = subprocess.run(
             [str(worker_python), str(Path(__file__).resolve()), "--web-worker", url],
             capture_output=True, text=True, timeout=50,
             env=sanitized_browser_env(), check=False
         )
         if result.returncode:
-            raise RuntimeError("Inspeção Playwright falhou: " + result.stderr[-500:])
+            raise RuntimeError(
+                "Falha no kit de inspeção. Em Gerenciar > Ambiente, clique "
+                "em Preparar / reparar kit."
+            )
         try:
             parsed = json.loads(result.stdout)
-            blob = base64.b64decode(parsed["_image_b64"], validate=True)
             if not isinstance(parsed, dict) or parsed.get("mode") != "web":
                 raise ValueError("Resposta inesperada do subprocesso")
+            blob = base64.b64decode(parsed["_image_b64"], validate=True)
             return make_image_result(blob, "web", parsed.get("diagnostics"))
         except (KeyError, ValueError, TypeError, base64.binascii.Error) as error:
-            raise RuntimeError("Resposta inválida do ambiente Playwright") from error
+            raise RuntimeError("Resposta inválida do kit Playwright") from error
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise RuntimeError("Playwright ausente no kit. Use Reparar kit.") from exc
 
     errors = []
     blocked = []
