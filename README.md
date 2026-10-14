@@ -39,7 +39,7 @@ O processo permanece em espera **sem imprimir "Tarefas executadas: 0"**. Ao enco
 
 ## Serviço em segundo plano no Linux (systemd --user)
 
-Não precisa manter um terminal aberto. Pare o agente interativo com Ctrl+C, atualize o repositório e, após confirmar que \`gh auth token\` funciona, instale o serviço:
+Não precisa manter um terminal aberto. Pare o agente interativo com Ctrl+C, atualize o repositório e, após confirmar que `gh auth token` funciona, instale o serviço:
 
 ```bash
 python3 solo_mcp.py service install
@@ -47,9 +47,9 @@ python3 solo_mcp.py service status
 python3 solo_mcp.py service logs
 ```
 
-O serviço inicia automaticamente ao entrar na sessão Linux e consulta a fila em silêncio a cada 10 segundos, enquanto estiver ativo. Para parar: \`python3 solo_mcp.py service stop\`; reiniciar: \`python3 solo_mcp.py service restart\`; remover apenas o serviço: \`python3 solo_mcp.py service uninstall\`.
+O serviço inicia automaticamente ao entrar na sessão Linux e consulta a fila em silêncio a cada 10 segundos, enquanto estiver ativo. Para parar: `python3 solo_mcp.py service stop`; reiniciar: `python3 solo_mcp.py service restart`; remover apenas o serviço: `python3 solo_mcp.py service uninstall`.
 
-**Aprovações em segundo plano:** o serviço **não executa \`run\` ou \`write\` sem confirmação**. Essas Issues permanecem abertas, aguardando revisão. Em qualquer terminal, execute:
+**Aprovações em segundo plano:** o serviço **não executa `run` ou `write` sem confirmação**. Essas Issues permanecem abertas, aguardando revisão. Em qualquer terminal, execute:
 
 ```bash
 cd ~/Solo-MCP
@@ -57,9 +57,9 @@ python3 solo_mcp.py pending
 python3 solo_mcp.py approve --issue NUMERO
 ```
 
-Veja a operação apresentada e digite \`s\` para autorizar ou \`n\` para rejeitar. Operações de leitura e diagnóstico continuam automáticas. Não rode o serviço e outro \`serve\` simultaneamente; no estado atual, execução concorrente não tem garantia de exclusão mútua.
+Veja a operação apresentada e digite `s` para autorizar ou `n` para rejeitar. Operações de leitura e diagnóstico continuam automáticas. Não rode o serviço e outro `serve` simultaneamente; no estado atual, execução concorrente não tem garantia de exclusão mútua.
 
-Serviços \`systemd --user\` são executados na sessão do usuário, **não como root**. Fora da sessão, a inicialização após desligar/logoff depende da configuração de *linger* do Linux; não ativamos isso automaticamente. Se o serviço falhar por não encontrar credenciais, verifique \`gh auth token\` e os logs. O serviço não consegue pedir \`S/N\` em segundo plano, por isso delegamos essas aprovações ao CLI.
+Serviços `systemd --user` são executados na sessão do usuário, **não como root**. Fora da sessão, a inicialização após desligar/logoff depende da configuração de *linger* do Linux; não ativamos isso automaticamente. Se o serviço falhar por não encontrar credenciais, verifique `gh auth token` e os logs. O serviço não consegue pedir `S/N` em segundo plano, por isso delegamos essas aprovações ao CLI.
 
 ## Enviar uma tarefa pelo ChatGPT
 
