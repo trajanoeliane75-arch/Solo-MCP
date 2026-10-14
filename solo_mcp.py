@@ -27,6 +27,7 @@ READ_LIMIT = 20000
 OUTPUT_LIMIT = 20000
 BLOCKED_NAMES = {'.env', '.npmrc', '.pypirc', 'id_rsa', 'id_ed25519', 'credentials', 'credentials.json', 'secrets.json', 'known_hosts'}
 BLOCKED_PARTS = {'.ssh', '.gnupg', '.aws', '.git', '.config', '.kube', 'node_modules'}
+MUTATING_ACTIONS = frozenset({'run', 'write', 'open_app', 'open_document', 'web_search', 'doc_create', 'doc_append', 'venv_create'})
 ALLOWED_TOOLS = {'python', 'python3', 'pytest', 'git', 'javap', 'java', 'jar', 'unzip', 'zipinfo', 'ls', 'find', 'grep', 'rg', 'head', 'tail', 'file', 'stat', 'strings', 'jadx', 'usb-devices', 'lsusb'}
 
 
@@ -123,16 +124,17 @@ def safe_path(root, relative, write=False):
     return target
 
 
-def approve(description):
+def approve(description, handler=None):
     print('\n[APROVAÇÃO LOCAL NECESSÁRIA]')
     print(description[:2500])
-    response = input('Autorizar esta operação? [s/N]: ').strip().casefold()
+    response = (input('Autorizar esta operação? [s/N]: ').strip().casefold()
+                if handler is None else ('s' if handler(description) else 'n'))
     approved = response == 's'
     print('Operação autorizada.' if approved else 'Operação cancelada.')
     return approved
 
 
-def do_task(config, task):
+def do_task(config, task, approval_callback=None):
     if not isinstance(task, dict) or task.get('version') != 1:
         raise ValueError('Formato de tarefa inválido')
     action = task.get('action')
@@ -180,7 +182,7 @@ def do_task(config, task):
         current = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
         if current != task.get('expected_sha256', None):
             raise ValueError('expected_sha256 não confere (proteção contra sobrescrita)')
-        if not approve(f'Gravar {path} ({len(content.encode("utf-8"))} bytes); SHA anterior: {current}'):
+        if not approve(f'Gravar {path} ({len(content.encode("utf-8"))} bytes); SHA anterior: {current}', approval_callback):
             return {'status': 'rejected'}
         # Recheck before write to avoid changed file since approval.
         now = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
@@ -200,7 +202,7 @@ def do_task(config, task):
             raise ValueError('argv inválido')
         if argv[0] not in ALLOWED_TOOLS:
             raise ValueError('Executável não está na lista permitida')
-        if not approve(f'Projeto: {root}\nExecutar sem shell: {json.dumps(argv, ensure_ascii=False)}'):
+        if not approve(f'Projeto: {root}\nExecutar sem shell: {json.dumps(argv, ensure_ascii=False)}', approval_callback):
             return {'status': 'rejected'}
         seconds = min(90, max(1, int(task.get('timeout', 30))))
         try:
@@ -208,6 +210,91 @@ def do_task(config, task):
             return {'returncode': run.returncode, 'stdout': run.stdout[:OUTPUT_LIMIT], 'stderr': run.stderr[:OUTPUT_LIMIT]}
         except subprocess.TimeoutExpired:
             return {'status': 'timeout', 'seconds': seconds}
+    if action == 'open_app':
+        app = task.get('app')
+        commands = {
+            'writer': ['libreoffice', '--writer'],
+            'files': ['xdg-open', str(root)],
+            'browser': ['xdg-open', 'https://www.google.com/'],
+        }
+        if app not in commands:
+            raise ValueError('Aplicativo não permitido; use writer, files ou browser')
+        if not approve(f'Abrir aplicativo {app} no ambiente gráfico?', approval_callback):
+            return {'status': 'rejected'}
+        command = commands[app]
+        subprocess.Popen(command, cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return {'status': 'launched', 'app': app}
+    if action == 'web_search':
+        query = task.get('query')
+        if not isinstance(query, str) or not 1 <= len(query.strip()) <= 300:
+            raise ValueError('Pesquisa inválida')
+        url = 'https://www.google.com/search?' + urllib.parse.urlencode({'q': query})
+        if not approve(f'Abrir no navegador pesquisa Google:\n{query}', approval_callback):
+            return {'status': 'rejected'}
+        subprocess.Popen(['xdg-open', url], cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return {'status': 'launched', 'url': url}
+    if action == 'open_document':
+        path = safe_path(root, task.get('path'))
+        if not path.is_file():
+            raise ValueError('Documento inexistente')
+        if not approve(f'Abrir arquivo com aplicativo padrão:\n{path}', approval_callback):
+            return {'status': 'rejected'}
+        subprocess.Popen(['xdg-open', str(path)], cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return {'status': 'launched', 'path': str(path.relative_to(root))}
+    if action in ('doc_create', 'doc_append'):
+        path = safe_path(root, task.get('path'), write=True)
+        text = task.get('text')
+        if path.suffix.lower() != '.docx':
+            raise ValueError('Somente documentos .docx')
+        if not isinstance(text, str) or not 0 < len(text.encode('utf-8')) <= 20000:
+            raise ValueError('Texto do documento inválido')
+        if not path.parent.is_dir() or path.is_symlink():
+            raise ValueError('Destino inválido')
+        exists = path.exists()
+        if action == 'doc_create' and exists:
+            raise ValueError('Documento já existe; utilize doc_append')
+        if action == 'doc_append' and (not exists or not path.is_file()):
+            raise ValueError('Documento inexistente; utilize doc_create')
+        old = hashlib.sha256(path.read_bytes()).hexdigest() if exists else None
+        if old != task.get('expected_sha256', None):
+            raise ValueError('expected_sha256 não corresponde ao documento')
+        if not approve(f'{action}: {path}\nConteúdo ({len(text)} caracteres):\n{text[:1800]}', approval_callback):
+            return {'status': 'rejected'}
+        now = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+        if now != old:
+            raise ValueError('Documento mudou durante aprovação')
+        try:
+            from docx import Document
+        except ImportError as ex:
+            raise RuntimeError('Instale python-docx no ambiente Python do aplicativo antes de usar DOCX') from ex
+        doc = Document(str(path)) if exists else Document()
+        for line in text.splitlines():
+            doc.add_paragraph(line)
+        fd, temp = tempfile.mkstemp(prefix='.solo-mcp-docx-', suffix='.docx', dir=path.parent)
+        os.close(fd)
+        try:
+            doc.save(temp)
+            if not exists and path.exists():
+                raise ValueError('Documento foi criado durante a operação')
+            if exists and hashlib.sha256(path.read_bytes()).hexdigest() != old:
+                raise ValueError('Documento foi alterado antes da gravação')
+            os.replace(temp, path)
+        finally:
+            if os.path.exists(temp):
+                os.unlink(temp)
+        return {'status': 'written', 'path': str(path.relative_to(root)),
+                'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    if action == 'venv_create':
+        directory = task.get('path', '.venv')
+        target = safe_path(root, directory, write=True)
+        if target.exists() or not target.parent.is_dir():
+            raise ValueError('Diretório do ambiente já existe ou pasta pai inexistente')
+        if not approve(f'Criar ambiente virtual Python em {target} (NÃO é sandbox contra malware)', approval_callback):
+            return {'status': 'rejected'}
+        done = subprocess.run([sys.executable, '-m', 'venv', str(target)], cwd=root,
+                              text=True, capture_output=True, timeout=120)
+        return {'status': 'created' if done.returncode == 0 else 'failed',
+                'returncode': done.returncode, 'stderr': done.stderr[:OUTPUT_LIMIT]}
     raise ValueError('Ação desconhecida: ' + str(action))
 
 
@@ -237,9 +324,9 @@ def process_once(config, gh, background=False, issue_number=None, sensitive_only
         number = int(issue['number'])
         if issue_number is not None and number != issue_number:
             continue
-        if background and task.get('action') in ('run', 'write'):
+        if background and task.get('action') in MUTATING_ACTIONS:
             continue  # sem TTY: deixe pendente para aprovação explícita no CLI
-        if sensitive_only and task.get('action') not in ('run', 'write'):
+        if sensitive_only and task.get('action') not in MUTATING_ACTIONS:
             continue
         path = '/repos/' + repo + '/issues/' + str(number)
         previous = gh.request('GET', path + '/comments?per_page=100')
@@ -355,7 +442,7 @@ def pending_tasks(config, gh):
         if issue.get('pull_request') or issue.get('user', {}).get('login', '').lower() != owner:
             continue
         task = parse_task(issue.get('body', ''))
-        if task and task.get('action') in ('run', 'write'):
+        if task and task.get('action') in MUTATING_ACTIONS:
             pending.append((int(issue['number']), str(task.get('project')), task['action']))
     return sorted(pending)
 
@@ -376,6 +463,9 @@ def cli():
     service = sub.add_parser('service', help='Gerenciar serviço systemd --user')
     service.add_argument('action', choices=['install', 'start', 'stop', 'restart', 'status', 'logs', 'uninstall'])
     sub.add_parser('pending', help='Mostrar tarefas aguardando aprovação')
+    sub.add_parser('desktop', help='Abrir painel persistente de aprovações no ambiente gráfico')
+    desktop_autostart = sub.add_parser('desktop-autostart', help='Gerenciar início do painel na sessão gráfica')
+    desktop_autostart.add_argument('action', choices=['install', 'uninstall'])
     approve_cmd = sub.add_parser('approve', help='Processar tarefa mutável com confirmação S/N no terminal')
     approve_cmd.add_argument('--issue', type=int, required=True)
     args = ap.parse_args()
@@ -394,6 +484,12 @@ def cli():
         print(f'Projeto {args.name} registrado: {root}')
     elif args.command == 'service':
         manage_service(args.action)
+    elif args.command == 'desktop':
+        from solo_desktop import start_desktop
+        start_desktop()
+    elif args.command == 'desktop-autostart':
+        from solo_desktop import manage_autostart
+        manage_autostart(args.action)
     elif args.command == 'pending':
         conf = load_config()
         gh = Github(gh_token())
