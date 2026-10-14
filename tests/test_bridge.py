@@ -14,7 +14,7 @@ class BridgeTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        self.config = {'control_repo': 'owner/private', 'projects': {'test': {'path': str(self.root)}}}
+        self.config = {'control_repo': 'owner/private', 'projects': {'test': {'path': str(self.root), 'permissions': {'read':True,'write':True,'terminal':True,'desktop':True,'environment':True}}}}
 
     def tearDown(self):
         self.tmp.cleanup()
