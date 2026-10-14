@@ -5,11 +5,13 @@ action, and return bytes in memory for the private control-channel transport.
 No continuous recording, background screenshot or automatic Chrome attachment.
 """
 import base64
-import io
+import json
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 from urllib.parse import urlsplit
 
 MAX_SCREENSHOT_BYTES = 420_000
@@ -79,22 +81,51 @@ def make_image_result(image, mode, diagnostics=None):
     }
 
 
+
+INSPECT_VENV = Path.home() / ".local" / "share" / "solo-mcp" / "inspect-venv"
+
+
+def sanitized_browser_env():
+    """Do not pass GitHub tokens and unrelated app secrets to browser processes."""
+    deny = ("TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "API_KEY",
+            "GITHUB", "GH_", "AWS_", "SSH_", "SOLO_MCP_", "OPENAI_")
+    return {k: v for k, v in os.environ.items()
+            if not any(term in k.upper() for term in deny)}
+
+
 def inspect_web(url):
     """New, independent browser session. Only loopback HTTP, including subresources."""
     validate_target({"mode": "web", "url": url})
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
-        raise RuntimeError(
-            "Playwright não instalado. Prepare um ambiente Python próprio e execute "
-            "pip install playwright; depois python -m playwright install chromium."
-        ) from exc
+        worker_python = INSPECT_VENV / "bin" / "python"
+        if not worker_python.is_file():
+            raise RuntimeError(
+                "Playwright não instalado. Crie o ambiente opcional inspect-venv "
+                "e instale Playwright + Chromium conforme docs/INSPECTION.md."
+            ) from exc
+        result = subprocess.run(
+            [str(worker_python), str(Path(__file__).resolve()), "--web-worker", url],
+            capture_output=True, text=True, timeout=50,
+            env=sanitized_browser_env(), check=False
+        )
+        if result.returncode:
+            raise RuntimeError("Inspeção Playwright falhou: " + result.stderr[-500:])
+        try:
+            parsed = json.loads(result.stdout)
+            blob = base64.b64decode(parsed["_image_b64"], validate=True)
+            if not isinstance(parsed, dict) or parsed.get("mode") != "web":
+                raise ValueError("Resposta inesperada do subprocesso")
+            return make_image_result(blob, "web", parsed.get("diagnostics"))
+        except (KeyError, ValueError, TypeError, base64.binascii.Error) as error:
+            raise RuntimeError("Resposta inválida do ambiente Playwright") from error
 
     errors = []
     blocked = []
     with sync_playwright() as playwright:
         try:
-            browser = playwright.chromium.launch(headless=True)
+            browser = playwright.chromium.launch(headless=True, env=sanitized_browser_env())
         except Exception as exc:
             raise RuntimeError(
                 "Chromium do Playwright indisponível. Instale pelo ambiente Python "
@@ -203,3 +234,12 @@ def inspect(task):
     if target["mode"] == "web":
         return inspect_web(target["url"])
     return inspect_window()
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3 or sys.argv[1] != "--web-worker":
+        raise SystemExit("Ação não suportada")
+    try:
+        print(json.dumps(inspect_web(sys.argv[2]), ensure_ascii=False))
+    except Exception as exc:
+        print("Erro no trabalhador Playwright: " + str(exc)[:400], file=sys.stderr)
+        raise SystemExit(1)
