@@ -12,6 +12,8 @@ ACTION_CAPABILITIES = {
     "read": ("read",),
     "archive_list": ("read",),
     "file_info": ("read",),
+    "workspace_info": ("read",),
+    "workspace_context": ("read",),
     "doc_read": ("read",),
     "git_status": ("read",),
     "write": ("write",),
@@ -96,11 +98,18 @@ def register_project(config, name, path, repo="", replace=False):
     if name in existing and not replace:
         raise ValueError("Projeto já cadastrado (evita substituição acidental): " + name)
     if name in existing and replace:
-        permissions = permissions_for(existing[name])
+        before = existing[name]
+        permissions = permissions_for(before)
+        # Preserve workspace context/repo links when re-pointing its local folder.
+        updated = dict(before)
+        if not repo:
+            repo = before.get("github", "")
     else:
         permissions = default_permissions()
-    existing[name] = {"path": str(path), "github": repo, "permissions": permissions}
-    return existing[name]
+        updated = {}
+    updated.update({"path": str(path), "github": repo, "permissions": permissions})
+    existing[name] = updated
+    return updated
 
 
 def set_permissions(config, name, names):
