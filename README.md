@@ -4,6 +4,22 @@ Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python loca
 
 > **Importante:** esta versão **não implementa um servidor MCP nativo**. Usa as APIs oficiais do GitHub como transporte. Não substitui Codex/Work, não aumenta limites da assinatura do ChatGPT e não permite que uma conversa rode autonomamente em segundo plano. A IA precisa poder criar Issues no repositório privado e consultar seus comentários.
 
+## Gerenciamento pela interface gráfica
+
+A janela principal já permite **criar workspaces por seletor de pasta**,
+vincular/desvincular repositórios (inclusive referências de contas diferentes),
+configurar **permissões por projeto**, editar o **contexto privado** e consultar
+o status de serviços e Podman.
+
+Clique em **Gerenciar** no painel compacto **Solo-MCP · Aprovações**.
+O painel continua aberto e funcionando enquanto você gerencia os projetos.
+
+Após atualizar o código com `git pull --ff-only`, reinicie o painel compacto
+para aparecer o novo botão. A janela principal também pode ser iniciada para
+diagnóstico com `python3 solo_mcp.py manager`.
+
+**[Manual e testes da interface gráfica](docs/GUI.md)**.
+
 ## Workspaces persistentes (como áreas de trabalho do Codex)
 
 O Solo-MCP agora separa o **workspace local** (pasta, permissões e contexto)
@@ -157,7 +173,7 @@ As seguintes ações podem ser enviadas pelo ChatGPT via Issue com corpo SOLO_MC
 
 **Senhas Linux:** o Solo-MCP não solicita, recebe nem armazena senhas de administrador. Uma versão futura poderá chamar diálogos oficiais da sessão via Polkit, com um auxiliar administrativo restrito e auditável. Não use sudo ou pkexec com comandos vindos diretamente do GitHub.
 
-**Dependências e arquivos não confiáveis:** um ambiente virtual Python **NÃO** protege contra malware; comandos pip/npm e scripts instaladores podem ler ou modificar arquivos do usuário. A instalação de bibliotecas e a inspeção de downloads suspeitos exigirão contêineres rootless (Podman), limites de CPU/memória, rede desativada por padrão e acesso mínimo a diretórios. Essa sandbox ainda **não foi implementada**. Evite executar dependências não confiáveis no computador real.
+**Dependências e arquivos não confiáveis:** um ambiente virtual Python **NÃO** protege contra malware; comandos pip/npm e scripts instaladores podem ler ou modificar arquivos do usuário. A instalação de bibliotecas e a inspeção de downloads suspeitos exigirão contêineres rootless (Podman), limites de CPU/memória, rede desativada por padrão e acesso mínimo a diretórios. Uma primeira sandbox experimental com Podman rootless já está implementada, mas ainda não foi auditada ou validada no computador de todos os usuários. Evite executar dependências não confiáveis fora de um ambiente isolado.
 
 Exemplos do protocolo (somente JSON no corpo da Issue, sem comentários fora dele):
 
