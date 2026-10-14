@@ -173,10 +173,17 @@ def prepare(on_progress=None, *, repair=False):
     py = kit_python()
     if not py.is_file():
         notice("Criando ambiente privado do Solo-MCP...")
-        _run(
-            [sys.executable, "-m", "venv", str(KIT_ROOT)],
-            timeout=130, env=env,
-        )
+        try:
+            _run(
+                [sys.executable, "-m", "venv", str(KIT_ROOT)],
+                timeout=130, env=env,
+            )
+        except RuntimeError as exc:
+            raise RuntimeError(
+                "Não foi possível criar o ambiente privado. Pode estar faltando "
+                "python3-venv no Linux. O Solo-MCP pode preparar esse requisito "
+                "com uma autorização administrativa separada."
+            ) from exc
     if not py.is_file():
         raise RuntimeError(
             "Python venv não ficou disponível. O sistema pode precisar do "
@@ -219,6 +226,30 @@ def prepare(on_progress=None, *, repair=False):
 def native_missing():
     return [program for program in ("xwininfo", "import")
             if shutil.which(program) is None]
+
+
+def system_python_plan():
+    """Only a fixed Debian/Ubuntu system package with OS authorization."""
+    if not Path("/usr/bin/apt-get").is_file():
+        return None
+    privilege = shutil.which("pkexec")
+    if not privilege:
+        return None
+    return [privilege, "/usr/bin/apt-get", "install", "-y", "python3-venv"]
+
+
+def prepare_system_python(on_progress=None):
+    """Call only after separate explicit GUI confirmation."""
+    plan = system_python_plan()
+    if plan is None:
+        raise RuntimeError(
+            "Não há instalador automático de python3-venv disponível "
+            "nesta distribuição Linux."
+        )
+    if on_progress:
+        on_progress("Solicitando autenticação administrativa para python3-venv...")
+    _run(plan, timeout=420)
+    return True
 
 
 def system_package_plan():
