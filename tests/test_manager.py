@@ -192,6 +192,16 @@ class ManagerBackendTests(unittest.TestCase):
             self.assertEqual(ui.permission_vars["terminal"].get(), False)
             self.assertEqual(ui.heading.cget("text"), "test")
 
+            # First-run onboarding is a real GUI prompt, not an automatic
+            # download or an instruction to run pip manually.
+            with patch.object(self.backend, "kit_status", return_value={"ready":False}), \
+                 patch.object(manager.solo_kit, "deferred_setup", return_value=False), \
+                 patch("tkinter.messagebox.askyesno", return_value=True), \
+                 patch.object(ui, "prepare_kit") as prepare:
+                ui._offer_kit_setup()
+            prepare.assert_called_once_with(confirm=False)
+
+
             ui._render_git_status({
                 "is_repo": True, "root": str(self.project),
                 "branch": "main", "changed": 2, "untracked": 1,
