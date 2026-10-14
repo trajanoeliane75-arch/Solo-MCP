@@ -369,6 +369,14 @@ def _unit_quote(value):
     return '"' + value.replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%') + '"'
 
 
+def _unit_working_directory(value):
+    """WorkingDirectory= accepts an unquoted absolute path, not shell arguments."""
+    value = str(value)
+    if not value.startswith('/') or any(c in value for c in '\r\n\x00"'):
+        raise ValueError('Diretório de trabalho inválido para unidade systemd')
+    return value.replace('\\', '\\\\').replace('%', '%%')
+
+
 def generate_user_unit(script_path=None, python_path=None):
     """Generate a background-only, non-root systemd user unit."""
     script = Path(script_path or __file__).resolve()
@@ -381,7 +389,7 @@ def generate_user_unit(script_path=None, python_path=None):
         '[Service]\n'
         'Type=simple\n'
         f'ExecStart={_unit_quote(python)} {_unit_quote(script)} serve --background\n'
-        f'WorkingDirectory={_unit_quote(script.parent)}\n'
+        f'WorkingDirectory={_unit_working_directory(script.parent)}\n'
         'Restart=on-failure\n'
         'RestartSec=10\n'
         'NoNewPrivileges=true\n'
@@ -397,17 +405,35 @@ def manage_service(action):
     if sys.platform != 'linux':
         raise RuntimeError('Serviço systemd --user disponível somente no Linux')
     base = ['systemctl', '--user']
-    if action == 'install':
+    if action in ('install', 'repair'):
         load_config()  # Evita instalar serviço sem configuração
         SERVICE_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         content = generate_user_unit()
-        if SERVICE_FILE.exists() and SERVICE_FILE.read_text(encoding='utf-8') != content:
-            raise RuntimeError('Unidade já existe e é diferente; revise antes de substituir')
+        if SERVICE_FILE.exists():
+            current = SERVICE_FILE.read_text(encoding='utf-8')
+            if current != content:
+                if action != 'repair':
+                    raise RuntimeError('Unidade antiga difere da atual. Execute: python3 solo_mcp.py service repair')
+                if not current.startswith('[Unit]\nDescription=Solo-MCP - ponte de tarefas GitHub\n'):
+                    raise RuntimeError('Unidade existente não parece pertencer ao Solo-MCP. Não será substituída.')
+                backup = SERVICE_FILE.with_suffix('.service.bak')
+                if backup.exists():
+                    raise RuntimeError(f'Backup de unidade já existente: {backup}. Revise antes de reparar.')
+                backup.write_text(current, encoding='utf-8')
+                backup.chmod(0o600)
+                print('Backup da unidade anterior:', backup)
         SERVICE_FILE.write_text(content, encoding='utf-8')
         SERVICE_FILE.chmod(0o600)
         subprocess.run(base + ['daemon-reload'], check=True)
+        if action == 'repair':
+            subprocess.run(base + ['reset-failed', SERVICE_NAME], check=False)
         subprocess.run(base + ['enable', '--now', SERVICE_NAME], check=True)
-        print('Serviço instalado e iniciado. Execute: python3 solo_mcp.py service status')
+        if action == 'repair':
+            subprocess.run(base + ['restart', SERVICE_NAME], check=True)
+        active = subprocess.run(base + ['is-active', '--quiet', SERVICE_NAME], check=False)
+        if active.returncode != 0:
+            raise RuntimeError('Unidade instalada, mas não está ativa. Consulte: python3 solo_mcp.py service logs')
+        print('Serviço ativo. Execute: python3 solo_mcp.py service status')
         return
     if action == 'uninstall':
         subprocess.run(base + ['disable', '--now', SERVICE_NAME], check=True)
@@ -461,7 +487,7 @@ def cli():
     run.add_argument('--interval', type=int, default=10)
     run.add_argument('--background', action='store_true', help='Sem TTY: deixar run/write pendentes de aprovação')
     service = sub.add_parser('service', help='Gerenciar serviço systemd --user')
-    service.add_argument('action', choices=['install', 'start', 'stop', 'restart', 'status', 'logs', 'uninstall'])
+    service.add_argument('action', choices=['install', 'repair', 'start', 'stop', 'restart', 'status', 'logs', 'uninstall'])
     sub.add_parser('pending', help='Mostrar tarefas aguardando aprovação')
     sub.add_parser('desktop', help='Abrir painel persistente de aprovações no ambiente gráfico')
     desktop_autostart = sub.add_parser('desktop-autostart', help='Gerenciar início do painel na sessão gráfica')
