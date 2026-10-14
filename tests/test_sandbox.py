@@ -43,6 +43,12 @@ class SandboxTests(unittest.TestCase):
         self.assertTrue(any(str(self.root) in arg and 'readonly=true' in arg for arg in cmd))
         self.assertTrue(any('destination=/packages,readonly=true' in arg for arg in cmd))
 
+    def test_reject_ambiguous_host_mount_path(self):
+        bad = self.root / 'foo,bar'
+        bad.mkdir()
+        with self.assertRaisesRegex(ValueError,'montagem Podman'):
+            sandbox.build_run_command('dev',bad,['python3','-V'])
+
     def test_volume_matches_across_stages(self):
         installed=sandbox.build_install_command('dev',self.root,['numpy'])
         runtime=sandbox.build_run_command('dev',self.root,['python3','-V'])
