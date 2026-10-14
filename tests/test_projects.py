@@ -118,6 +118,34 @@ class ProjectPermissionTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             sp.check_permission(self.conf,'b','write')
 
+    def test_binary_file_info_returns_sha256(self):
+        sample = self.a / 'sample.bin'
+        sample.write_bytes(b'\x00hello\xff')
+        sp.register_project(self.conf,'test',self.a)
+        result = sm.do_task(self.conf,{'version':1,'project':'test',
+                                      'action':'file_info','path':'sample.bin'})
+        import hashlib
+        self.assertEqual(result['sha256'],hashlib.sha256(sample.read_bytes()).hexdigest())
+        self.assertEqual(result['size_bytes'],7)
+
+    def test_doc_read_uses_optional_parser(self):
+        sp.register_project(self.conf,'test',self.a)
+        (self.a/'report.docx').write_bytes(b'Fake zip placeholder')
+        from types import SimpleNamespace
+        fake = SimpleNamespace(Document=lambda filename: SimpleNamespace(
+            paragraphs=[SimpleNamespace(text='primeiro'),SimpleNamespace(text='segundo')]))
+        with patch.dict(sys.modules,{'docx':fake}):
+            result=sm.do_task(self.conf,{'version':1,'project':'test',
+                                         'action':'doc_read','path':'report.docx'})
+        self.assertEqual(result['text'],'primeiro\nsegundo')
+
+    def test_file_info_inaccessible_without_read_permission(self):
+        sp.register_project(self.conf,'test',self.a)
+        sp.set_permissions(self.conf,'test','write')
+        with self.assertRaises(PermissionError):
+            sm.do_task(self.conf,{'version':1,'project':'test',
+                                  'action':'file_info','path':'test.txt'})
+
     def test_service_reloads_permissions_every_cycle(self):
         sp.register_project(self.conf,'test',self.a)
         first = self.conf
