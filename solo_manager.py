@@ -76,6 +76,7 @@ class ManagerBackend:
         config = self.load()
         workspaces.unlink_repository(config, name, repo, account)
         sm.save_config(config)
+        return True
 
     def read_context(self, name):
         config = self.load()
@@ -94,6 +95,7 @@ class ManagerBackend:
             workspaces.read_context(config, name)
         workspaces.set_context_sharing(config, name, enabled)
         sm.save_config(config)
+        return enabled
 
     def system_checks(self):
         """Collect non-privileged status in a background thread."""
@@ -348,10 +350,12 @@ class ManagerWindow:
 
     def refresh(self, prefer=None):
         from tkinter import messagebox
-        if self._has_unsaved_context() and not messagebox.askyesno(
-            "Solo-MCP", "Descartar alterações não salvas no contexto?", parent=self.root
-        ):
-            return
+        if self._has_unsaved_context():
+            if not messagebox.askyesno(
+                "Solo-MCP", "Descartar alterações não salvas no contexto?", parent=self.root
+            ):
+                return
+            self.context_text.edit_modified(False)
         previous = prefer or self.current
         try:
             names, selected = self.backend.names()
@@ -394,6 +398,11 @@ class ManagerWindow:
         name = selection[0] if selection else None
         if name == self.current and not force:
             return
+        if force and name == self.current and self._has_unsaved_context():
+            if not messagebox.askyesno(
+                "Solo-MCP", "Descartar alterações não salvas no contexto?", parent=self.root
+            ):
+                return
         self.current = name
         if name is None:
             self.heading.configure(text="Nenhum workspace cadastrado")
