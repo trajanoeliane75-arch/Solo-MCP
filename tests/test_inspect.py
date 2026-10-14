@@ -131,7 +131,7 @@ class InspectTests(unittest.TestCase):
     def test_missing_playwright_dep_is_explained(self):
         with patch.object(inspect, "INSPECT_VENV", self.root / "absent"), \
              patch.dict(sys.modules, {"playwright":None, "playwright.sync_api":None}):
-            with self.assertRaisesRegex(RuntimeError,"Playwright não instalado"):
+            with self.assertRaisesRegex(RuntimeError,"Kit essencial não preparado"):
                 inspect.inspect_web("http://127.0.0.1:3000/")
 
     def test_native_mode_rejects_url(self):
