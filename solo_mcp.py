@@ -170,6 +170,37 @@ def do_task(config, task, approval_callback=None):
         with zipfile.ZipFile(path) as z:
             infos = z.infolist()[:100]
             return {'entries': [{'name': i.filename[:250], 'bytes': i.file_size} for i in infos], 'truncated': len(z.infolist()) > 100}
+    if action == 'file_info':
+        path = safe_path(root, task.get('path'))
+        if not path.is_file():
+            raise ValueError('Arquivo não encontrado')
+        size = path.stat().st_size
+        maximum = 64 * 1024 * 1024
+        result = {'path': str(path.relative_to(root)), 'size_bytes': size, 'sha256': None}
+        if size > maximum:
+            result['hash_skipped'] = 'Arquivo acima de 64 MiB'
+        else:
+            digest = hashlib.sha256()
+            with path.open('rb') as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b''):
+                    digest.update(block)
+            result['sha256'] = digest.hexdigest()
+        return result
+    if action == 'doc_read':
+        path = safe_path(root, task.get('path'))
+        if not path.is_file() or path.suffix.lower() != '.docx':
+            raise ValueError('Documento .docx não encontrado')
+        if path.stat().st_size > 16 * 1024 * 1024:
+            raise ValueError('Documento grande demais para leitura automática')
+        try:
+            from docx import Document
+        except ImportError as ex:
+            raise RuntimeError('python-docx ausente; no Ubuntu instale python3-docx') from ex
+        document = Document(str(path))
+        lines = [p.text for p in document.paragraphs[:300]]
+        content = '\n'.join(lines)
+        return {'path': str(path.relative_to(root)), 'text': content[:READ_LIMIT],
+                'truncated': len(content) > READ_LIMIT or len(document.paragraphs) > 300}
     if action == 'git_status':
         run = subprocess.run(['git', '-C', str(root), 'status', '--short', '--branch'], text=True, capture_output=True, timeout=20)
         return {'returncode': run.returncode, 'stdout': run.stdout[:OUTPUT_LIMIT], 'stderr': run.stderr[:OUTPUT_LIMIT]}
