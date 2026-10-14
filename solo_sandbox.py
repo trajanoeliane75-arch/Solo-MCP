@@ -97,7 +97,7 @@ def build_run_command(project_name, root, argv):
     root = Path(root).resolve(strict=True)
     if not root.is_dir():
         raise ValueError("Diretório do projeto inexistente")
-    if any(c in str(root) for c in (',', '\\n', '\\r', '\\x00')):
+    if any(c in str(root) for c in (',', '\n', '\r', '\x00')):
         raise ValueError('Caminho contém caracteres incompatíveis com a montagem Podman')
     volume = package_volume(project_name, root)
     return (
