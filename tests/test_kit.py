@@ -115,6 +115,27 @@ class KitTests(unittest.TestCase):
         self.assertFalse(kit.deferred_setup())
         self.assertTrue(kit.status()["ready"])
 
+    def test_missing_python_venv_is_recoverable_with_clear_message(self):
+        with patch.object(kit.os, "geteuid", return_value=1000), \
+             patch.object(kit, "_run", side_effect=RuntimeError("venv failed")):
+            with self.assertRaisesRegex(RuntimeError, "python3-venv"):
+                kit.prepare()
+
+    def test_python_system_package_install_has_fixed_args(self):
+        plan = ["/usr/bin/pkexec", "/usr/bin/apt-get",
+                "install", "-y", "python3-venv"]
+        with patch.object(kit, "system_python_plan", return_value=plan), \
+             patch.object(kit, "_run", return_value=None) as call:
+            self.assertTrue(kit.prepare_system_python())
+        call.assert_called_once_with(plan, timeout=420)
+
+    def test_no_privilege_helper_reports_unsupported_system(self):
+        with patch.object(kit, "system_python_plan", return_value=None), \
+             patch.object(kit, "_run") as call:
+            with self.assertRaisesRegex(RuntimeError, "não é suportada|não há instalador|Não há instalador"):
+                kit.prepare_system_python()
+        call.assert_not_called()
+
     def test_native_install_requires_separate_privilege_tool(self):
         with patch.object(kit,"native_missing",return_value=["import"]), \
              patch.object(kit,"system_package_plan",return_value=None), \
