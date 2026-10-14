@@ -367,11 +367,14 @@ def process_once(config, gh, background=False, issue_number=None, sensitive_only
     return total
 
 
-def serve_tasks(config, gh, once=False, interval=10, background=False):
+def serve_tasks(config, gh, once=False, interval=10, background=False, reload_config=False):
     """Consulta tarefas continuamente; só imprime quando há trabalho ou erro."""
     while True:
         try:
-            total = process_once(config, gh, background=background)
+            current = load_config() if reload_config else config
+            if current['control_repo'] != config['control_repo']:
+                raise RuntimeError('Canal de controle alterado: reinicie o serviço para revisar a mudança')
+            total = process_once(current, gh, background=background)
             if total:
                 print(f'Tarefas executadas: {total}', flush=True)
         except Exception as ex:
@@ -506,6 +509,7 @@ def cli():
     add.add_argument('--repo', default='')
     add.add_argument('--replace', action='store_true', help='Substituir cadastro existente, preservando permissões')
     sub.add_parser('projects', help='Listar projetos e permissões efetivas')
+    sub.add_parser('sandbox-check', help='Verificar disponibilidade de Podman rootless e imagem Python')
     setp = sub.add_parser('set-permissions', help='Substituir permissões de projeto')
     setp.add_argument('--project', required=True)
     setp.add_argument('--allow', required=True, help='Capacidades separadas por vírgulas; ex.: read,write')
@@ -566,6 +570,15 @@ def cli():
             ap.error(str(exc))
         save_config(conf)
         print(f'Projeto {args.name} removido do cadastro. Nenhum arquivo foi excluído.')
+    elif args.command == 'sandbox-check':
+        from solo_sandbox import podman_preflight, DEFAULT_IMAGE
+        podman_preflight()
+        probe = subprocess.run(['podman', 'image', 'exists', DEFAULT_IMAGE], check=False)
+        print('Podman rootless: disponível')
+        if probe.returncode:
+            print('Imagem ausente. Baixe manualmente: podman pull ' + DEFAULT_IMAGE)
+        else:
+            print('Imagem Python para sandbox: disponível')
     elif args.command == 'service':
         manage_service(args.action)
     elif args.command == 'desktop':
@@ -599,7 +612,7 @@ def cli():
             mode = 'somente leitura' if args.background else 'interativo'
             print(f'Aguardando tarefas ({mode}, consulta a cada {max(10, args.interval)}s). Ctrl+C para sair.')
         try:
-            serve_tasks(conf, gh, once=args.once, interval=args.interval, background=args.background)
+            serve_tasks(conf, gh, once=args.once, interval=args.interval, background=args.background, reload_config=True)
         except KeyboardInterrupt:
             print('\nPonte encerrada.')
 
