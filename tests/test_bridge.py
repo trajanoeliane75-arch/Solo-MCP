@@ -1,4 +1,6 @@
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -93,9 +95,59 @@ class BridgeTests(unittest.TestCase):
     def test_service_unit_is_user_background_only(self):
         unit = sm.generate_user_unit('/tmp/Solo MCP/solo_mcp.py', '/usr/bin/python3')
         self.assertIn('solo_mcp.py" serve --background', unit)
+        self.assertIn('WorkingDirectory=/tmp/Solo MCP\n', unit)
+        self.assertNotIn('WorkingDirectory="', unit)
         self.assertIn('NoNewPrivileges=true', unit)
         self.assertIn('WantedBy=default.target', unit)
         self.assertNotIn('User=root', unit)
+
+    @unittest.skipUnless(shutil.which('systemd-analyze'), 'systemd-analyze não disponível')
+    def test_systemd_analyze_accepts_generated_unit(self):
+        folder = self.root / 'Solo MCP com espaços'
+        folder.mkdir()
+        script = folder / 'solo_mcp.py'
+        script.write_text('print("test")')
+        unit = sm.generate_user_unit(script, sys.executable)
+        unit_path = self.root / 'solo-mcp.service'
+        unit_path.write_text(unit)
+        result = subprocess.run(['systemd-analyze', 'verify', str(unit_path)],
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_service_repair_replaces_own_bad_unit_and_keeps_backup(self):
+        service_file = self.root / 'solo-mcp.service'
+        old = sm.generate_user_unit('/tmp/Solo-MCP/solo_mcp.py', '/usr/bin/python3')
+        old = old.replace('WorkingDirectory=/tmp/Solo-MCP',
+                          'WorkingDirectory="/tmp/Solo-MCP"')
+        service_file.write_text(old)
+        with patch.object(sm, 'SERVICE_FILE', service_file), \
+             patch.object(sm, 'load_config', return_value=self.config), \
+             patch.object(sm.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as run:
+            sm.manage_service('repair')
+        self.assertEqual(service_file.read_text(), sm.generate_user_unit())
+        self.assertNotIn('WorkingDirectory="', service_file.read_text())
+        backup = service_file.with_suffix('.service.bak')
+        self.assertEqual(backup.read_text(), old)
+        self.assertTrue(any('is-active' in c.args[0] for c in run.call_args_list))
+
+    def test_service_repair_rejects_foreign_unit(self):
+        service_file = self.root / 'solo-mcp.service'
+        service_file.write_text('[Unit]\nDescription=unrelated\n')
+        with patch.object(sm, 'SERVICE_FILE', service_file), \
+             patch.object(sm, 'load_config', return_value=self.config):
+            with self.assertRaisesRegex(RuntimeError, 'não parece pertencer'):
+                sm.manage_service('repair')
+
+    def test_service_reports_failure_when_inactive(self):
+        service_file = self.root / 'solo-mcp.service'
+        def fake_run(argv, **kwargs):
+            code = 3 if 'is-active' in argv else 0
+            return subprocess.CompletedProcess(argv, code)
+        with patch.object(sm, 'SERVICE_FILE', service_file), \
+             patch.object(sm, 'load_config', return_value=self.config), \
+             patch.object(sm.subprocess, 'run', side_effect=fake_run):
+            with self.assertRaisesRegex(RuntimeError, 'não está ativa'):
+                sm.manage_service('install')
 
     def test_pending_tasks_only_list_run_write(self):
         class Stub:
