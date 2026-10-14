@@ -31,39 +31,23 @@ seleciona manualmente a janela nativa. Capturas compartilhadas podem ficar
 no histórico das Issues privadas. Não selecione janelas com senhas,
 mensagens privadas ou dados que não deseja enviar ao GitHub.
 
-## Preparação única no computador
+## Preparação automática do kit interno
 
-Depois de atualizar o Solo-MCP, instale somente as ferramentas necessárias
-para o modo que pretende usar.
+O usuário não precisa executar comandos pip nem preparar Playwright ou Chromium manualmente. Depois de atualizar o Solo-MCP, abra o painel de aprovações e clique em **Gerenciar**. Na primeira abertura, o aplicativo pergunta se você quer preparar seu **kit essencial**.
 
-### Modo janela Linux Mint / Ubuntu X11
+Após a confirmação, ele cria um ambiente Python privado em `~/.local/share/solo-mcp/kit-v1`, instala uma versão definida do Playwright, baixa o Chromium e abre o navegador num teste real. As etapas aparecem na aba **Ambiente**, que também oferece **Preparar / reparar kit** em caso de falha.
 
-```bash
-sudo apt install x11-utils imagemagick
-```
+O kit é propriedade do aplicativo: não é compartilhado com o Python principal, nem com bibliotecas e ambientes dos workspaces. Exige conexão com a internet na primeira instalação. Se bibliotecas do sistema operacional faltarem, o programa informa que a preparação não foi concluída.
 
-Caso use Wayland, a seleção X11 ainda não é suportada; o agente recusa a
-captura em vez de compartilhar a tela toda. Em Linux Mint Cinnamon,
-verifique se a sessão atual é X11 antes de testar.
+### Captura de janela Linux
 
-### Modo web Playwright
+No Linux X11, a seleção de janelas exige `xwininfo` e ImageMagick. Se estiverem ausentes, a interface oferece **Preparar suporte a janelas X11**. Em distribuições Debian/Ubuntu compatíveis com `apt-get` e `pkexec`, o usuário confirma uma etapa **separada**, com autenticação administrativa para instalar apenas `x11-utils` e `imagemagick`. Se o gerenciador da distribuição ou a autenticação não estiverem disponíveis, a interface explica a pendência.
 
-O Playwright é opcional e fica em **um venv próprio**, sem alterar as
-bibliotecas de outros projetos ou a instalação Python do sistema:
+Em Wayland, a seleção X11 não é suportada, mas a inspeção web continua possível.
 
-```bash
-python3 -m venv ~/.local/share/solo-mcp/inspect-venv
-~/.local/share/solo-mcp/inspect-venv/bin/python -m pip install playwright
-~/.local/share/solo-mcp/inspect-venv/bin/python -m playwright install chromium
-```
+### Separação do kit e dos projetos
 
-Se o navegador avisar sobre bibliotecas de sistema ausentes, instale
-apenas as dependências informadas pelo Playwright e pela distribuição.
-Não use `sudo pip install`. O Playwright precisa baixar o Chromium uma vez.
-
-O serviço Solo-MCP e o painel de aprovações **continuam usando seu Python
-normal**. O agente usa o Python separado do ambiente de inspeção apenas
-quando você pede Playwright.
+O painel e o serviço mantêm seu próprio Python inicial. O processo de inspeção web usa exclusivamente o Python do kit. Dependências específicas de projetos usam ambientes separados, como `venv` ou Podman. Solicitações remotas não podem instalar bibliotecas no kit.
 
 ## Enviar uma inspeção via ChatGPT
 
