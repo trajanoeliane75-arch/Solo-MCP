@@ -198,13 +198,13 @@ class ManagerBackendTests(unittest.TestCase):
                 "remote_name": "origin", "github_name": "example/test",
                 "github_url": "https://github.com/example/test"
             })
-            self.assertEqual(ui.open_github_button.cget("state"), "normal")
+            self.assertTrue(ui.open_github_button.instate(["!disabled"]))
             self.assertIn("Branch: main", ui.git_text.get("1.0", "end"))
             with patch.object(manager.webbrowser, "open") as open_url:
                 ui.open_github()
             open_url.assert_called_once_with("https://github.com/example/test")
             ui._render_git_status({"is_repo": False, "message": "Sem Git"})
-            self.assertEqual(ui.open_github_button.cget("state"), "disabled")
+            self.assertTrue(ui.open_github_button.instate(["disabled"]))
 
 
             # Exercise actual GUI callbacks with dialogs stubbed, not just construction.
