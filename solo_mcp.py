@@ -18,6 +18,8 @@ import urllib.parse
 import urllib.request
 import zipfile
 
+import solo_projects
+
 CONFIG_PATH = Path.home() / '.config' / 'solo-mcp' / 'config.json'
 SERVICE_FILE = Path.home() / '.config' / 'systemd' / 'user' / 'solo-mcp.service'
 SERVICE_NAME = 'solo-mcp.service'
@@ -138,6 +140,7 @@ def do_task(config, task, approval_callback=None):
     if not isinstance(task, dict) or task.get('version') != 1:
         raise ValueError('Formato de tarefa inválido')
     action = task.get('action')
+    solo_projects.check_permission(config, task.get('project'), action)
     root = resolve_project(config, task.get('project'))
     if action == 'list':
         path = safe_path(root, task.get('path', '.'))
@@ -482,6 +485,13 @@ def cli():
     add.add_argument('--name', required=True)
     add.add_argument('--path', required=True)
     add.add_argument('--repo', default='')
+    add.add_argument('--replace', action='store_true', help='Substituir cadastro existente, preservando permissões')
+    sub.add_parser('projects', help='Listar projetos e permissões efetivas')
+    setp = sub.add_parser('set-permissions', help='Substituir permissões de projeto')
+    setp.add_argument('--project', required=True)
+    setp.add_argument('--allow', required=True, help='Capacidades separadas por vírgulas; ex.: read,write')
+    remove = sub.add_parser('remove-project', help='Remover somente o cadastro, sem apagar arquivos')
+    remove.add_argument('--name', required=True)
     run = sub.add_parser('serve', help='Escutar novas tarefas')
     run.add_argument('--once', action='store_true')
     run.add_argument('--interval', type=int, default=10)
@@ -502,12 +512,41 @@ def cli():
         print('Configuração local criada:', CONFIG_PATH)
     elif args.command == 'add-project':
         conf = load_config()
-        root = Path(args.path).expanduser().resolve(strict=True)
-        if not root.is_dir():
-            ap.error('Caminho não é diretório')
-        conf.setdefault('projects', {})[args.name] = {'path': str(root), 'github': args.repo}
+        try:
+            entry = solo_projects.register_project(conf, args.name, args.path, args.repo, args.replace)
+        except (ValueError, OSError) as exc:
+            ap.error(str(exc))
         save_config(conf)
-        print(f'Projeto {args.name} registrado: {root}')
+        print(f"Projeto {args.name} registrado: {entry['path']}")
+        print('Permissões iniciais: somente leitura. Edite com set-permissions quando necessário.')
+    elif args.command == 'projects':
+        conf = load_config()
+        projects = conf.get('projects', {})
+        if not projects:
+            print('Nenhum projeto cadastrado.')
+        for name, entry in sorted(projects.items()):
+            perms = solo_projects.permissions_for(entry)
+            allowed = ','.join(key for key, enabled in perms.items() if enabled) or 'nenhuma'
+            marker = ' [cadastro antigo: somente leitura]' if 'permissions' not in entry else ''
+            print(f"{name}: {entry['path']} | repo={entry.get('github') or '-'} | permite={allowed}{marker}")
+    elif args.command == 'set-permissions':
+        conf = load_config()
+        try:
+            perms = solo_projects.set_permissions(conf, args.project, args.allow)
+        except ValueError as exc:
+            ap.error(str(exc))
+        save_config(conf)
+        print(f"Permissões para {args.project}: " + 
+              (', '.join(name for name, enabled in perms.items() if enabled) or 'nenhuma'))
+        print('As permissões não dispensam a aprovação visual nas operações sensíveis.')
+    elif args.command == 'remove-project':
+        conf = load_config()
+        try:
+            solo_projects.remove_project(conf, args.name)
+        except ValueError as exc:
+            ap.error(str(exc))
+        save_config(conf)
+        print(f'Projeto {args.name} removido do cadastro. Nenhum arquivo foi excluído.')
     elif args.command == 'service':
         manage_service(args.action)
     elif args.command == 'desktop':
