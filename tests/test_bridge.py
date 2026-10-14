@@ -76,6 +76,44 @@ class BridgeTests(unittest.TestCase):
         sleep.assert_not_called()
         output.assert_not_called()
 
+    def test_background_skips_mutating_issues(self):
+        class Stub:
+            def request(self, method, endpoint, data=None):
+                if endpoint == '/repos/owner/private':
+                    return {'owner': {'login': 'owner'}, 'private': True}
+                if '/issues?' in endpoint:
+                    return [{'number': 3, 'user': {'login': 'owner'}, 'body': sm.MARKER +
+                             '\n' + json.dumps({'version': 1, 'project': 'test',
+                                                'action': 'write', 'path': 'a.txt', 'content': 'hi'})}]
+                raise AssertionError(f'Unexpected API call: {method} {endpoint}')
+        with patch.object(sm, 'do_task') as run:
+            self.assertEqual(sm.process_once(self.config, Stub(), background=True), 0)
+            run.assert_not_called()
+
+    def test_service_unit_is_user_background_only(self):
+        unit = sm.generate_user_unit('/tmp/Solo MCP/solo_mcp.py', '/usr/bin/python3')
+        self.assertIn('solo_mcp.py" serve --background', unit)
+        self.assertIn('NoNewPrivileges=true', unit)
+        self.assertIn('WantedBy=default.target', unit)
+        self.assertNotIn('User=root', unit)
+
+    def test_pending_tasks_only_list_run_write(self):
+        class Stub:
+            def request(self, method, endpoint, data=None):
+                if endpoint == '/repos/owner/private':
+                    return {'owner': {'login': 'owner'}, 'private': True}
+                if '/issues?' in endpoint:
+                    return [
+                        {'number': 8, 'user': {'login': 'owner'}, 'body': sm.MARKER +
+                         '\n' + json.dumps({'version': 1, 'project': 'test', 'action': 'run'})},
+                        {'number': 7, 'user': {'login': 'owner'}, 'body': sm.MARKER +
+                         '\n' + json.dumps({'version': 1, 'project': 'test', 'action': 'read'})},
+                        {'number': 9, 'user': {'login': 'stranger'}, 'body': sm.MARKER +
+                         '\n' + json.dumps({'version': 1, 'project': 'test', 'action': 'write'})},
+                    ]
+                raise AssertionError(f'Unexpected API call: {method} {endpoint}')
+        self.assertEqual(sm.pending_tasks(self.config, Stub()), [(8, 'test', 'run')])
+
     def test_private_guard(self):
         class Stub:
             def request(self, method, endpoint):
