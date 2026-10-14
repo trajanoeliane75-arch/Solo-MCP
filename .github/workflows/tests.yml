@@ -23,6 +23,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile
-        run: python -m compileall -q solo_mcp.py solo_desktop.py solo_projects.py solo_sandbox.py tests
+        run: python -m compileall -q solo_mcp.py solo_desktop.py solo_projects.py solo_workspaces.py solo_sandbox.py tests
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
