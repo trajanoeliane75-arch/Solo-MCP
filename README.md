@@ -4,6 +4,24 @@ Ponte experimental **ChatGPT ↔ GitHub Issues (privadas) ↔ agente Python loca
 
 > **Importante:** esta versão **não implementa um servidor MCP nativo**. Usa as APIs oficiais do GitHub como transporte. Não substitui Codex/Work, não aumenta limites da assinatura do ChatGPT e não permite que uma conversa rode autonomamente em segundo plano. A IA precisa poder criar Issues no repositório privado e consultar seus comentários.
 
+## Projetos e ambientes isolados
+
+Agora há permissões locais por projeto (leitura, escrita, terminal, desktop e ambiente) e um ambiente experimental com Podman rootless para dependências. **Projetos cadastrados nas versões anteriores continuam somente com leitura até você conceder direitos explicitamente.** Isso é intencional.
+
+Para atualizar e conceder permissões somente ao projeto SumUp:
+
+```bash
+cd ~/Solo-MCP
+git pull --ff-only
+python3 solo_mcp.py projects
+python3 solo_mcp.py set-permissions --project sumup --allow read,write,desktop,environment
+python3 solo_mcp.py service restart
+```
+
+O direito `terminal` **não é concedido neste exemplo**: a operação `run` executa Python e outros programas com os direitos da conta Linux, fora de uma sandbox. Adicione `terminal` apenas quando necessário e para tarefas revisadas. A confirmação pelo painel continua sendo exigida.
+
+Documentação completa: **[Permissões, novos projetos, Podman rootless e DOCX](docs/PROJECTS_SANDBOX.md)**.
+
 ## Segurança por padrão
 
 - **O repositório deste código pode ser público, mas o repositório de controle tem que ser PRIVADO.** O agente recusa controle público.
@@ -151,9 +169,13 @@ O agente consulta Issues abertas e, após executar, comenta `SOLO_MCP_RESULT_V1`
 | `list` | `path` (padrão `.`) | Lista até 100 itens |
 | `read` | `path` | Lê texto até 20 KB, com proteções para segredos |
 | `archive_list` | `path` | Lista conteúdo de ZIP/JAR/AAR sem extrair |
+| `file_info` | `path` | Retorna tamanho e SHA-256 de arquivo binário, até 64 MiB |
+| `doc_read` | `path` | Extrai texto de DOCX (python-docx opcional) |
 | `git_status` | nenhum | Executa `git status --short --branch` |
 | `run` | `argv`: lista, `timeout`: segundos | Pede aprovação local, sem shell, até 90 s |
 | `write` | `path`, `content`, `expected_sha256` | Pede aprovação; protege contra sobrescrita inesperada |
+| `sandbox_install` | `packages` | Instala bibliotecas Python num volume Podman, sem acesso ao projeto |
+| `sandbox_run` | `argv` | Roda Python sem rede e com projeto somente leitura |
 
 Exemplo de comando:
 
