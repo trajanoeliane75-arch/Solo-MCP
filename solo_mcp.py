@@ -593,6 +593,7 @@ def cli():
     service.add_argument('action', choices=['install', 'repair', 'start', 'stop', 'restart', 'status', 'logs', 'uninstall'])
     sub.add_parser('pending', help='Mostrar tarefas aguardando aprovação')
     sub.add_parser('desktop', help='Abrir painel persistente de aprovações no ambiente gráfico')
+    sub.add_parser('manager', help='Abrir interface gráfica de workspaces e permissões')
     desktop_autostart = sub.add_parser('desktop-autostart', help='Gerenciar início do painel na sessão gráfica')
     desktop_autostart.add_argument('action', choices=['install', 'uninstall'])
     approve_cmd = sub.add_parser('approve', help='Processar tarefa mutável com confirmação S/N no terminal')
@@ -712,6 +713,9 @@ def cli():
     elif args.command == 'desktop':
         from solo_desktop import start_desktop
         start_desktop()
+    elif args.command == 'manager':
+        from solo_manager import start_manager
+        start_manager()
     elif args.command == 'desktop-autostart':
         from solo_desktop import manage_autostart
         manage_autostart(args.action)
