@@ -165,6 +165,31 @@ class ManagerBackendTests(unittest.TestCase):
             self.assertEqual(ui.permission_vars["read"].get(), True)
             self.assertEqual(ui.permission_vars["terminal"].get(), False)
             self.assertEqual(ui.heading.cget("text"), "test")
+
+            # Exercise actual GUI callbacks with dialogs stubbed, not just construction.
+            ui.permission_vars["desktop"].set(True)
+            with patch("tkinter.messagebox.askyesno", return_value=True):
+                ui.save_permissions()
+            self.assertTrue(self.backend.details("test")["permissions"]["desktop"])
+
+            ui.context_text.insert("1.0", "# Projeto\n\nDecisões.")
+            ui.save_context()
+            self.assertIn("Decisões.", self.backend.read_context("test"))
+
+            ui.share_var.set(True)
+            with patch("tkinter.messagebox.askyesno", return_value=True):
+                ui.save_sharing()
+            self.assertTrue(self.backend.details("test")["context_shared"])
+
+            new_folder = self.base / "gui-created"
+            new_folder.mkdir()
+            with patch("tkinter.simpledialog.askstring", return_value="novo"), \
+                 patch("tkinter.filedialog.askdirectory", return_value=str(new_folder)):
+                ui.create_dialog()
+            self.assertIn("novo", ui.tree.get_children())
+            self.assertEqual(ui.current, "novo")
+            self.assertFalse(self.backend.details("novo")["permissions"]["terminal"])
+            self.assertEqual(ui.heading.cget("text"), "novo")
         finally:
             root.destroy()
 
