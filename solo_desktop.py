@@ -176,7 +176,7 @@ class Panel:
                 self.items.delete(0,'end')
                 for entry in data:
                     task=entry['task']
-                    self.items.insert('end',f"#{entry['number']} · {task.get('project')} · {task.get('action')}")
+                    self.items.insert('end',f"#{entry['number']} · {(task.get('workspace') or task.get('project'))} · {task.get('action')}")
                 for i,entry in enumerate(data):
                     if entry['number']==old_id:self.items.selection_set(i)
                 self.label.config(text=f'{len(data)} tarefa(s) aguardando aprovação')
@@ -199,7 +199,7 @@ class Panel:
         if item is None or self.busy:return
         op='Autorizar' if allow else 'Recusar'
         task=item['task']
-        description=f"Issue #{item['number']}\nProjeto: {task.get('project')}\nAção: {task.get('action')}"
+        description=f"Issue #{item['number']}\nProjeto: {(task.get('workspace') or task.get('project'))}\nAção: {task.get('action')}"
         if not messagebox.askyesno('Solo-MCP',f'{op} esta tarefa?\n\n{description}\nRevise a prévia antes de confirmar.',parent=self.root):
             return
         self.busy=True
