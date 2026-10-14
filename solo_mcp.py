@@ -29,7 +29,7 @@ READ_LIMIT = 20000
 OUTPUT_LIMIT = 20000
 BLOCKED_NAMES = {'.env', '.npmrc', '.pypirc', 'id_rsa', 'id_ed25519', 'credentials', 'credentials.json', 'secrets.json', 'known_hosts'}
 BLOCKED_PARTS = {'.ssh', '.gnupg', '.aws', '.git', '.config', '.kube', 'node_modules'}
-MUTATING_ACTIONS = frozenset({'run', 'write', 'open_app', 'open_document', 'web_search', 'doc_create', 'doc_append', 'venv_create'})
+MUTATING_ACTIONS = frozenset({'run', 'write', 'open_app', 'open_document', 'web_search', 'doc_create', 'doc_append', 'venv_create', 'sandbox_install', 'sandbox_run'})
 ALLOWED_TOOLS = {'python', 'python3', 'pytest', 'git', 'javap', 'java', 'jar', 'unzip', 'zipinfo', 'ls', 'find', 'grep', 'rg', 'head', 'tail', 'file', 'stat', 'strings', 'jadx', 'usb-devices', 'lsusb'}
 
 
@@ -298,6 +298,25 @@ def do_task(config, task, approval_callback=None):
                               text=True, capture_output=True, timeout=120)
         return {'status': 'created' if done.returncode == 0 else 'failed',
                 'returncode': done.returncode, 'stderr': done.stderr[:OUTPUT_LIMIT]}
+    if action == 'sandbox_install':
+        from solo_sandbox import build_install_command, run_sandbox
+        packages = task.get('packages')
+        command = build_install_command(task['project'], root, packages)
+        preview = ('Instalar dependências APENAS em volume isolado do Podman com rede ativa.\n'
+                   'Nenhum arquivo do projeto será montado neste contêiner.\n'
+                   'Pacotes: ' + json.dumps(packages, ensure_ascii=False))
+        if not approve(preview, approval_callback):
+            return {'status': 'rejected'}
+        return run_sandbox(command, task.get('timeout', 180))
+    if action == 'sandbox_run':
+        from solo_sandbox import build_run_command, run_sandbox
+        command = build_run_command(task['project'], root, task.get('argv'))
+        preview = ('Executar código dentro do Podman SEM rede.\n'
+                   'Projeto montado somente para leitura; dependências em volume somente leitura.\n'
+                   'Comando: ' + json.dumps(task['argv'], ensure_ascii=False))
+        if not approve(preview, approval_callback):
+            return {'status': 'rejected'}
+        return run_sandbox(command, task.get('timeout', 120))
     raise ValueError('Ação desconhecida: ' + str(action))
 
 
