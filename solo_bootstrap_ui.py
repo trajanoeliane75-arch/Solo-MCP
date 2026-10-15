@@ -1,7 +1,8 @@
-"""Native GTK3 first-run screens for Solo, independent of WebKitGTK.
+"""Native GTK3 first-run screens, styled to the Solo art direction.
 
-This file never installs software or requests elevated privileges by itself.
-The launcher alone selects the fixed apt-get package list and invokes pkexec.
+Based on the original Solo design supplied by the user. No WebKit dependency.
+This module never authorizes a privileged operation or chooses packages:
+launch.py retains explicit consent, its fixed pkexec/apt-get command and timeout.
 """
 from pathlib import Path
 import subprocess
@@ -9,175 +10,205 @@ import sys
 import threading
 
 ROOT = Path(__file__).resolve().parent
-_ICON = ROOT / "share" / "icons" / "solo-128.png"
+_ICON = ROOT / 'share' / 'icons' / 'solo-128.png'
 
-_CSS = """
-.solo-dialog, .solo-dialog box, .solo-dialog dialog {
-    background-color: #ffffff;
-    color: #141414;
-}
-.solo-dialog label { color: #141414; font-family: sans-serif; }
-.solo-dialog .solo-title { font-size: 21px; font-weight: 600; }
-.solo-dialog .solo-detail { color: #595959; font-size: 12px; }
-.solo-dialog button {
-    background-image: none;
-    background-color: #ffffff;
-    border: 1px solid #e8e8e5;
-    border-radius: 22px;
-    box-shadow: none;
-    color: #141414;
-    min-height: 26px;
-    padding: 6px 17px;
-}
-.solo-dialog button.solo-primary {
-    background-color: #141414;
-    border-color: #141414;
-    color: #ffffff;
-}
-.solo-dialog button:hover { border-color: #999999; }
-.solo-dialog button.solo-primary:hover { background-color: #303030; }
-.solo-dialog progressbar trough {
-    background-color: #e8e8e5;
-    border-radius: 6px;
-    min-height: 8px;
-}
-.solo-dialog progressbar progress { background-color: #141414; border-radius: 6px; }
-"""
+# Solo light-theme tokens supplied by the designer (GTK CSS, not WebKit CSS).
+BG = '#ffffff'
+TEXT = '#141414'
+MUTED = '#8f8f8c'
+BORDER = '#e8e8e5'
+INK = '#141414'
+ON_INK = '#ffffff'
+CSS = f'''
+window.solo-bootstrap {{ background-color: {BG}; }}
+.solo-eyebrow {{ color: {MUTED}; font-size: 10px; font-weight: 500; }}
+.solo-title {{ color: {TEXT}; font-size: 19px; font-weight: 300; }}
+.solo-body {{ color: {MUTED}; font-size: 13px; }}
+.solo-divider {{ background-color: {BORDER}; min-height: 1px; }}
+button.solo-primary {{
+  background-image: none; box-shadow: none;
+  background-color: {INK}; color: {ON_INK};
+  border: 1px solid {INK}; border-radius: 999px;
+  padding: 9px 18px; font-size: 12.5px; font-weight: 500;
+}}
+button.solo-primary:hover {{ background-color: #3a3a35; border-color: #3a3a35; }}
+button.solo-ghost {{
+  background-image: none; box-shadow: none;
+  background-color: transparent; color: {MUTED};
+  border: none; padding: 9px 4px;
+  font-size: 12.5px; font-weight: 500;
+}}
+button.solo-ghost:hover {{ color: {TEXT}; }}
+progressbar.solo-progress trough {{
+  background-color: {BORDER}; min-height: 2px;
+  border: none; border-radius: 0; box-shadow: none;
+}}
+progressbar.solo-progress progress {{
+  background-color: {INK}; min-height: 2px;
+  border: none; border-radius: 0; box-shadow: none;
+}}
+'''
+
+_provider = None
 
 
 def _gtk():
+    # Lazy import: show_error() must still work on machines missing PyGObject.
     import gi
-    gi.require_version("Gtk", "3.0")
-    from gi.repository import Gdk, GLib, Gtk
+    gi.require_version('Gtk', '3.0')
+    gi.require_version('Gdk', '3.0')
+    from gi.repository import Gtk, GLib, Gdk
     return Gtk, GLib, Gdk
 
 
-def _style(Gtk, Gdk):
+def _ensure_css(Gtk, Gdk):
+    global _provider
     screen = Gdk.Screen.get_default()
-    if screen:
-        css = Gtk.CssProvider()
-        css.load_from_data(_CSS.encode("utf-8"))
-        Gtk.StyleContext.add_provider_for_screen(
-            screen, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+    if screen is None:
+        return
+    if _provider is None:
+        _provider = Gtk.CssProvider()
+        _provider.load_from_data(CSS.encode('utf-8'))
+    Gtk.StyleContext.add_provider_for_screen(
+        screen, _provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )
 
 
-def _dialog(title, message, details=""):
-    Gtk, GLib, Gdk = _gtk()
-    _style(Gtk, Gdk)
-    dialog = Gtk.Dialog(title="Solo", flags=Gtk.DialogFlags.MODAL)
-    dialog.get_style_context().add_class("solo-dialog")
-    dialog.set_default_size(500, -1)
-    dialog.set_resizable(False)
-    dialog.set_border_width(20)
-    dialog.set_deletable(True)
+def _label(Gtk, text, css_class, wrap=True):
+    label = Gtk.Label(label=text)
+    label.get_style_context().add_class(css_class)
+    label.set_xalign(0.0)
+    if wrap:
+        label.set_line_wrap(True)
+        label.set_max_width_chars(44)
+    return label
+
+
+def _divider(Gtk):
+    bar = Gtk.Box()
+    bar.get_style_context().add_class('solo-divider')
+    bar.set_size_request(-1, 1)
+    return bar
+
+
+def _shell(Gtk, Gdk, title):
+    _ensure_css(Gtk, Gdk)
+    win = Gtk.Window(title=title)
+    win.get_style_context().add_class('solo-bootstrap')
+    win.set_default_size(420, -1)
+    win.set_resizable(False)
+    win.set_position(Gtk.WindowPosition.CENTER)
     if _ICON.is_file():
         try:
-            dialog.set_icon_from_file(str(_ICON))
+            win.set_icon_from_file(str(_ICON))
         except Exception:
-            pass  # Do not block installing WebKit because of an icon loader.
-    area = dialog.get_content_area()
-    area.set_spacing(14)
-    heading = Gtk.Label(label=title)
-    heading.set_xalign(0)
-    heading.get_style_context().add_class("solo-title")
-    area.pack_start(heading, False, False, 0)
-    body = Gtk.Label(label=message)
-    body.set_xalign(0)
-    body.set_line_wrap(True)
-    body.set_max_width_chars(60)
-    area.pack_start(body, False, False, 0)
-    if details:
-        detail = Gtk.Label(label=details)
-        detail.set_xalign(0)
-        detail.set_line_wrap(True)
-        detail.set_max_width_chars(60)
-        detail.get_style_context().add_class("solo-detail")
-        area.pack_start(detail, False, False, 0)
-    return Gtk, GLib, dialog, area
+            pass  # Icon availability never blocks first-run setup.
+    outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+    outer.set_border_width(32)
+    win.add(outer)
+    return win, outer
 
 
-def _button(dialog, Gtk, label, response, primary=False):
-    btn = dialog.add_button(label, response)
-    if primary:
-        btn.get_style_context().add_class("solo-primary")
-        dialog.set_default_response(response)
-    return btn
+def _run_window(win, GLib):
+    # A dedicated loop prevents the original double Gtk.main_quit() calls.
+    loop = GLib.MainLoop()
+    win.connect('destroy', lambda *_: loop.quit())
+    win.show_all()
+    loop.run()
 
 
 def ask_consent(packages):
-    """Request explicit permission; False never starts a privileged process."""
-    Gtk, _, dialog, _ = _dialog(
-        "Preparar o Solo",
-        "O Solo usa componentes gráficos do Linux para abrir a interface. "
-        "Eles ainda não estão disponíveis neste computador.",
-        "Componentes: " + ", ".join(packages) + ".\n\n"
-        "O próprio Linux solicitará sua senha administrativa para a instalação. "
-        "O Solo não recebe nem armazena essa senha.",
-    )
-    _button(dialog, Gtk, "Agora não", Gtk.ResponseType.CANCEL)
-    _button(dialog, Gtk, "Instalar e abrir", Gtk.ResponseType.OK, primary=True)
-    dialog.show_all()
-    try:
-        return dialog.run() == Gtk.ResponseType.OK
-    finally:
-        dialog.destroy()
+    """Explicit first-run consent. Closing the window means refusing."""
+    Gtk, GLib, Gdk = _gtk()
+    win, body = _shell(Gtk, Gdk, 'Preparar Solo')
+    body.pack_start(_label(Gtk, 'PRIMEIRA ABERTURA', 'solo-eyebrow'), False, False, 0)
+    body.pack_start(_label(Gtk, 'Solo usa o motor gráfico do seu sistema.', 'solo-title'), False, False, 0)
+    body.pack_start(_label(
+        Gtk, 'Para abrir a interface, faltam estes componentes: '
+        + ', '.join(packages)
+        + '. O Linux vai pedir sua autorização administrativa.', 'solo-body'
+    ), False, False, 0)
+    body.pack_start(_divider(Gtk), False, False, 6)
+    row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    row.set_halign(Gtk.Align.END)
+    cancel = Gtk.Button(label='Agora não')
+    cancel.get_style_context().add_class('solo-ghost')
+    install = Gtk.Button(label='Instalar e abrir')
+    install.get_style_context().add_class('solo-primary')
+    row.pack_start(cancel, False, False, 0)
+    row.pack_start(install, False, False, 0)
+    body.pack_start(row, False, False, 0)
+    result = {'approved': False}
+    cancel.connect('clicked', lambda *_: win.destroy())
+    install.connect('clicked', lambda *_: (result.__setitem__('approved', True), win.destroy()))
+    _run_window(win, GLib)
+    return result['approved']
 
 
 def run_with_progress(command, timeout=600):
-    """Show a responsive, non-cancellable progress dialog for fixed launcher command.
+    """Present the Claude-style 2px progress line during the launcher's fixed command.
 
-    Returns True only on successful subprocess exit. Never exposes captured
-    subprocess output to the UI; detailed package-manager logs remain private.
+    The window cannot be dismissed until the subprocess finishes. This fixes a
+    designer-code bug that otherwise allowed closing it while apt was running.
     """
-    Gtk, GLib, dialog, area = _dialog(
-        "Preparando o Solo",
-        "Instalando os componentes gráficos necessários…",
-        "O Linux pode solicitar confirmação administrativa numa janela separada. "
-        "Aguarde a conclusão da instalação.",
-    )
+    Gtk, GLib, Gdk = _gtk()
+    win, body = _shell(Gtk, Gdk, 'Preparando Solo')
+    body.pack_start(_label(Gtk, 'INSTALANDO', 'solo-eyebrow'), False, False, 0)
+    body.pack_start(_label(Gtk, 'Instalando componentes gráficos…', 'solo-title'), False, False, 0)
     progress = Gtk.ProgressBar()
-    progress.set_show_text(False)
-    area.pack_start(progress, False, False, 10)
-    dialog.set_deletable(False)
-    dialog.connect("delete-event", lambda *_: True)
-    outcome = {"success": False}
+    progress.get_style_context().add_class('solo-progress')
+    body.pack_start(progress, False, False, 10)
+    win.set_deletable(False)
+    win.connect('delete-event', lambda *_: True)
+    result = {'success': False}
+    loop = GLib.MainLoop()
+    win.connect('destroy', lambda *_: loop.quit())
 
-    def worker():
+    def _finish():
+        win.destroy()
+        return False
+
+    def _worker():
         try:
             completed = subprocess.run(
-                command, capture_output=True, text=True, timeout=timeout, check=False
+                command, capture_output=True, text=True,
+                timeout=timeout, check=False,
             )
-            outcome["success"] = completed.returncode == 0
+            result['success'] = completed.returncode == 0
         except (OSError, subprocess.TimeoutExpired):
-            outcome["success"] = False
-        GLib.idle_add(dialog.response, Gtk.ResponseType.OK)
+            result['success'] = False
+        finally:
+            GLib.idle_add(_finish)
 
-    def pulse():
+    def _pulse():
         progress.pulse()
         return True
 
-    source = GLib.timeout_add(110, pulse)
-    threading.Thread(target=worker, daemon=True).start()
-    dialog.show_all()
+    pulse_id = GLib.timeout_add(120, _pulse)
+    win.show_all()
+    threading.Thread(target=_worker, daemon=True).start()
     try:
-        dialog.run()
+        loop.run()
     finally:
-        GLib.source_remove(source)
-        dialog.destroy()
-    return outcome["success"]
+        GLib.source_remove(pulse_id)
+    return result['success']
 
 
 def show_error(message):
-    """A useful native error when GTK3 exists; stderr as a last-resort fallback."""
+    """Designer error state; fall back to stderr when GTK is not available."""
     try:
-        Gtk, _, dialog, _ = _dialog("Não foi possível abrir o Solo", message)
-        _button(dialog, Gtk, "Fechar", Gtk.ResponseType.CLOSE, primary=True)
-        dialog.show_all()
-        try:
-            dialog.run()
-        finally:
-            dialog.destroy()
-    except Exception:
-        # GTK itself may be missing; do not try to use WebKit or Zenity.
-        print("Solo: " + str(message), file=sys.stderr)
+        Gtk, GLib, Gdk = _gtk()
+        win, body = _shell(Gtk, Gdk, 'Solo')
+        body.pack_start(_label(Gtk, 'NÃO FOI POSSÍVEL CONTINUAR', 'solo-eyebrow'), False, False, 0)
+        body.pack_start(_label(Gtk, str(message), 'solo-body'), False, False, 0)
+        body.pack_start(_divider(Gtk), False, False, 6)
+        row = Gtk.Box()
+        row.set_halign(Gtk.Align.END)
+        ok = Gtk.Button(label='Entendi')
+        ok.get_style_context().add_class('solo-primary')
+        ok.connect('clicked', lambda *_: win.destroy())
+        row.pack_start(ok, False, False, 0)
+        body.pack_start(row, False, False, 0)
+        _run_window(win, GLib)
+    except (ImportError, ValueError, RuntimeError):
+        print('Solo: ' + str(message), file=sys.stderr)
