@@ -1,6 +1,6 @@
 # Projetos, permissões e ambientes isolados
 
-Esta versão do Solo-MCP continua funcionando por GitHub Issues privadas.
+Esta versão do Solo continua funcionando por GitHub Issues privadas.
 A configuração de projetos fica **somente no computador**:
  `~/.config/solo-mcp/config.json` (permissões 0600).
 

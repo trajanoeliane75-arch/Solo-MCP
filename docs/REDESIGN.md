@@ -23,7 +23,7 @@
    competiam por atenção. A fila virou uma página da janela principal. Apenas
    decisões de impacto abrem um diálogo de revisão.
 
-A captura de horário acadêmico de julho não pertence ao fluxo do Solo-MCP e
+A captura de horário acadêmico de julho não pertence ao fluxo do Solo e
 não foi usada como referência de produto.
 
 ## Direção visual

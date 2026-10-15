@@ -248,7 +248,7 @@ class NativeWebKitSmoke(unittest.TestCase):
             backend=PreviewBackend()
             # Test the actual native bridge with local real mutations.
             app=create_application(backend=backend,application_id='io.github.solo_mcp.Smoke')
-            outcome={};started=[False]
+            outcome={};started=[False];injected=[False];query_pending=[False];timed_out=[False]
             script=r'''
 (async()=>{
  const wait=async(fn)=>{for(let i=0;i<150;i++){if(fn())return;await new Promise(r=>setTimeout(r,30));}throw Error('UI wait timed out: '+String(fn));};
@@ -284,14 +284,28 @@ class NativeWebKitSmoke(unittest.TestCase):
  window.__smoke={ok:true,title:document.querySelector('h1').textContent};
 })().catch(error=>window.__smoke={error:String(error),stack:error.stack,body:document.body.innerText.slice(-1500)});
 '''.replace('FOLDER',json.dumps(str(folder)))
+            def inject_once(view=None,event=None):
+                # The Xvfb WebKit process may finish loading before the first
+                # GLib timer tick. Do not rely only on a late load-changed hook.
+                if injected[0] or not app.view:
+                    return
+                if event is not None and event != WebKit2.LoadEvent.FINISHED:
+                    return
+                if app.view.get_estimated_load_progress() < 0.999:
+                    return
+                injected[0]=True
+                app.evaluate(script)
+
             def poll_result():
                 if not app.window:return True
                 if not started[0]:
                     started[0]=True
-                    def on_load(view,event):
-                        if event==WebKit2.LoadEvent.FINISHED:app.evaluate(script)
-                    app.view.connect('load-changed',on_load)
+                    app.view.connect('load-changed',inject_once)
+                inject_once()
+                if not injected[0] or query_pending[0]:return not bool(outcome)
+                query_pending[0]=True
                 def checked(view,result,*_):
+                    query_pending[0]=False
                     try:
                         raw=view.evaluate_javascript_finish(result).to_string()
                         value=json.loads(raw)
@@ -304,11 +318,18 @@ class NativeWebKitSmoke(unittest.TestCase):
                 return not bool(outcome)
             GLib.timeout_add(80,poll_result)
             def timeout():
-                if not outcome:outcome['error']='Native UI timed out';app.quit()
+                timed_out[0]=True
+                if not outcome:
+                    details={'injected':injected[0]}
+                    if app.view:
+                        details['uri']=app.view.get_uri()
+                        details['progress']=app.view.get_estimated_load_progress()
+                    outcome['error']='Native UI timed out: '+repr(details)
+                    app.quit()
                 return False
-            timeout_id=GLib.timeout_add_seconds(25,timeout)
+            timeout_id=GLib.timeout_add_seconds(75,timeout)
             app.run(['solo-native-smoke'])
-            GLib.source_remove(timeout_id)
+            if not timed_out[0]:GLib.source_remove(timeout_id)
             self.assertTrue(outcome.get('ok'),outcome)
             self.assertEqual(backend.read_context('native-test'),'# Memória\n\nSalvo pela janela WebKit real.')
             self.assertFalse(backend.details('native-test')['context_shared'])

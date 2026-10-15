@@ -1,6 +1,6 @@
-# Contribuições ao Solo-MCP
+# Contribuições ao Solo
 
-O Solo-MCP disponibiliza o código-fonte para **estudo, colaboração,
+O Solo disponibiliza o código-fonte para **estudo, colaboração,
 alterações e redistribuição não comercial** sob a licença
 [PolyForm Noncommercial 1.0.0](LICENSE).
 
@@ -16,7 +16,7 @@ ChatGPT e os recursos autorizados do computador Linux.
 Para corrigir problemas, proponha um Pull Request com testes. Explique
 como a mudança melhora a tarefa principal: solicitar, autorizar, executar
 e verificar. Não adicione dependências aos ambientes dos usuários quando
-elas pertencem ao kit interno do Solo-MCP.
+elas pertencem ao kit interno do Solo.
 
 Ao submeter alterações, você confirma que tem o direito de contribuir com
 esse código e concorda que **sua contribuição seja distribuída sob os

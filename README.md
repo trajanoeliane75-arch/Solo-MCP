@@ -1,12 +1,19 @@
-# Solo-MCP
+# Solo
 
-Uma janela para seus projetos locais, contexto, permissões e aprovações de
-tarefas da IA. A interface desktop usa **Python + GTK/WebKitGTK**, com HTML/CSS
-local, sem terminal no uso diário, sem Electron e sem build de frontend.
+**Acabaram os créditos de Work ou Codex no meio do projeto?** O Solo permite
+continuar trabalhando com ajuda do ChatGPT: a conversa envia instruções curtas
+por um repositório privado do GitHub e **o seu próprio computador executa as
+tarefas**, depois da sua autorização quando necessário. Seus projetos e
+arquivos permanecem no seu computador.
 
-> O núcleo é uma ponte experimental **ChatGPT ↔ GitHub Issues privadas ↔ agente
-> Python local**. Ainda não implementa um servidor do protocolo MCP. A conversa
-> precisa conseguir criar Issues e consultar os resultados pelo GitHub.
+O Solo é uma janela para projetos locais, contexto, permissões e aprovações.
+A interface desktop usa **Python + GTK/WebKitGTK** e HTML/CSS local, sem
+terminal no uso diário, Electron ou build de frontend.
+
+> **O que o Solo é:** uma ponte entre ChatGPT, GitHub Issues privadas e um agente
+> Python local. **O que ainda não é:** um servidor do protocolo MCP (Model
+> Context Protocol). Usar a integração exige acesso à conversa e ao GitHub;
+> o Solo não recupera créditos nem contorna limites da sua conta.
 
 ## Nova experiência desktop
 
@@ -26,7 +33,7 @@ permitir leitura pelas tarefas. Novos workspaces começam somente com leitura.
 
 ## Kit de inspeção autogerenciado
 
-Em **Ferramentas → Preparar kit**, o Solo-MCP cria seu ambiente privado em
+Em **Ferramentas → Preparar kit**, o Solo cria seu ambiente privado em
 `~/.local/share/solo-mcp/kit-v1`, instala **Playwright 1.63.0**, baixa Chromium
 e testa a abertura do navegador. A operação mostra progresso e resultado;
 nenhum pacote é instalado no Python dos seus projetos.
@@ -38,7 +45,7 @@ do Linux usa autenticação administrativa do próprio sistema.
 
 ## Workspaces persistentes (como áreas de trabalho do Codex)
 
-O Solo-MCP agora separa o **workspace local** (pasta, permissões e contexto)
+O Solo separa o **workspace local** (pasta, permissões e contexto)
 dos **repositórios GitHub associados**. Um workspace pode apontar para
 repositórios de contas diferentes como metadados, sem trocar as credenciais
 ou alterar o repositório privado de controle.
@@ -93,7 +100,7 @@ Documentação completa: **[Permissões, novos projetos, Podman rootless e DOCX]
 Clone o repositório e abra **Solo-MCP.desktop** pelo gerenciador de arquivos
 (“Permitir iniciar”, se solicitado), ou abra `install.sh`. Como alternativa, execute
 `./install.sh` uma vez na pasta clonada. O instalador prepara a interface e
-registra **Solo-MCP** no menu do Linux. Depois disso, abra pelo ícone, sem terminal.
+registra **Solo** no menu do Linux. Depois disso, abra pelo ícone, sem terminal.
 
 Em **Configurações**, conecte sua conta pelo navegador, informe um repositório
 privado de controle e clique em **Verificar e salvar conexão**. Ative o serviço
@@ -101,7 +108,7 @@ para receber tarefas em segundo plano. Em **Ferramentas**, prepare a inspeção
 web ou instale os recursos opcionais de que precisar.
 
 A instalação guiada de componentes do sistema é oferecida em Debian/Ubuntu com
-Zenity e Polkit. Consulte os pacotes para outras distribuições no
+GTK3 e Polkit, com janelas nativas do Solo. Consulte os pacotes para outras distribuições no
 [manual desktop](docs/GUI.md). Não é preciso instalar Tkinter, Node ou Electron.
 
 O serviço usa systemd do usuário. A janela fecha sem parar o serviço; operações
@@ -126,7 +133,7 @@ As seguintes ações podem ser enviadas pelo ChatGPT via Issue com corpo SOLO_MC
 | doc_append | path, text e expected_sha256 | Acrescenta parágrafos ao DOCX e verifica integridade SHA-256 |
 | venv_create | path (padrão .venv) | Cria ambiente virtual Python em um projeto autorizado |
 
-**Documentos Word:** use LibreOffice Writer no Linux. Para editar DOCX programaticamente, o Python do Solo-MCP precisa ter a biblioteca opcional python-docx instalada. O Solo-MCP não cola texto arbitrariamente em aplicativos de terceiros; DOCX é alterado como documento e pode depois ser aberto no editor.
+**Documentos Word:** use LibreOffice Writer no Linux. Para editar DOCX programaticamente, o Python do Solo precisa ter a biblioteca opcional python-docx instalada. O Solo não cola texto arbitrariamente em aplicativos de terceiros; DOCX é alterado como documento e pode depois ser aberto no editor.
 
 **Senhas Linux:** o Solo-MCP não solicita, recebe nem armazena senhas de administrador. Uma versão futura poderá chamar diálogos oficiais da sessão via Polkit, com um auxiliar administrativo restrito e auditável. Não use sudo ou pkexec com comandos vindos diretamente do GitHub.
 

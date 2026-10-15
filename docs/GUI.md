@@ -1,6 +1,6 @@
-# Aplicativo desktop Solo-MCP
+# Aplicativo desktop Solo
 
-O aplicativo agora reúne **Início, Workspaces, Aprovações, Ferramentas,
+O aplicativo reúne **Início, Workspaces, Aprovações, Ferramentas,
 Configurações e Como funciona** em uma janela. Os dados existentes continuam
 em `~/.config/solo-mcp/`; a migração não altera permissões ou compartilha contexto.
 
@@ -9,7 +9,7 @@ em `~/.config/solo-mcp/`; a migração não altera permissões ou compartilha co
 No Linux, abra **Solo-MCP.desktop** pelo gerenciador de arquivos. Se o Linux
 solicitar, marque o arquivo como confiável / “Permitir iniciar”. Você também
 pode abrir `install.sh` e escolher executar. Uma alternativa para a instalação inicial é
-`./install.sh` na pasta clonada. A preparação registra **Solo-MCP** no menu de
+`./install.sh` na pasta clonada. A preparação registra **Solo** no menu de
 aplicativos. As próximas aberturas são pelo ícone, com `Terminal=false`.
 
 O caminho da cópia instalada fica no atalho. Se mover o repositório, execute
@@ -27,10 +27,14 @@ Node, Electron ou servidor HTTP na aplicação de produção.
 | Fedora | `python3-gobject gtk3 webkit2gtk4.1 xdg-utils` |
 | Arch | `python-gobject gtk3 webkit2gtk-4.1 xdg-utils` |
 
-Em Debian/Ubuntu com Zenity e Polkit, o launcher oferece instalar componentes
-ausentes por uma janela gráfica. Em outras distribuições, use os pacotes acima
-no gerenciador do sistema. Versões antigas sem WebKitGTK 4.1 precisam atualizar
-esse componente. A interface desktop continua sendo Linux; macOS e WSL não
+Em Debian/Ubuntu, o primeiro lançamento usa **diálogos nativos GTK3** com a
+identidade visual do Solo para apresentar a autorização, o progresso e erros
+de instalação. Não depende de Zenity. Se o GTK3 estiver ausente, instale
+primeiro `python3-gi` e `gir1.2-gtk-3.0` pelo gerenciador de pacotes; sem GTK
+não há interface gráfica disponível para exibir essa etapa. O instalador só
+chama `pkexec`/`apt-get` para os pacotes fixos indicados acima e após seu
+consentimento. Em outras distribuições, use o gerenciador do sistema.
+Versões antigas sem WebKitGTK 4.1 precisam atualizar esse componente. A interface desktop continua sendo Linux; macOS e WSL não
 foram validados nesta migração.
 
 **Tkinter não é dependência do aplicativo.** O kit Playwright/Chromium continua
@@ -49,7 +53,7 @@ separado da interface e é preparado somente quando o usuário solicita.
 4. **Ativar serviço:** começa a consulta em segundo plano. A janela pode fechar;
    tarefas sensíveis continuam esperando aprovação local.
 5. **Ferramentas → Preparar kit:** baixa Playwright e Chromium no ambiente
-   privado do Solo-MCP. Mostra progresso real, erro e conclusão.
+   privado do Solo. Mostra progresso real, erro e conclusão.
 
 É possível organizar workspaces e escrever contexto antes de conectar GitHub.
 Não há credenciais em JavaScript nem no arquivo de configuração do aplicativo;
@@ -101,8 +105,9 @@ A notificação é complementar: caso o gerenciador de notificações esteja
 desativado, as tarefas continuam disponíveis em **Aprovações**. O serviço
 de segundo plano permanece independente da janela.
 
-O launcher `launch.py` instala o atalho no menu de aplicativos local. Use o
-ícone **Solo-MCP** para iniciar a janela; o terminal não é obrigatório.
+O launcher `launch.py` instala o atalho e os ícones originais em
+`~/.local/share/icons/hicolor/`, sem privilégios administrativos. O menu e a
+janela usam o ícone próprio do **Solo**. Use esse ícone para iniciar a janela; o terminal não é obrigatório.
 Se o código for extraído em `Downloads`, o atalho aponta para essa pasta;
 não mova nem apague a pasta enquanto ela for usada pelo atalho. Para uma
 instalação permanente, coloque o aplicativo numa pasta estável antes de

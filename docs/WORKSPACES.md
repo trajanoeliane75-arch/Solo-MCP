@@ -1,4 +1,4 @@
-# Workspaces persistentes — Solo-MCP
+# Workspaces persistentes — Solo
 
 Um **workspace** representa um projeto de trabalho. Ele não é igual ao repositório
 GitHub privado usado como *transporte* de tarefas.
@@ -73,7 +73,7 @@ A associação de vários diretórios locais num workspace é uma evolução fut
 
 ## Contexto persistente do projeto
 
-O conteúdo fica fora do repositório do projeto e do repositório público Solo-MCP.
+O conteúdo fica fora do repositório do projeto e do repositório público do Solo.
 
 ```bash
 # Criar uma vez para projetos cadastrados anteriormente:

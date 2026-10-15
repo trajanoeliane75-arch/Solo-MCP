@@ -1,4 +1,4 @@
-# Git local e ambientes Python no Solo-MCP
+# Git local e ambientes Python no Solo
 
 ## Aba Repositórios — o que funciona
 
@@ -46,14 +46,14 @@ acesso aos arquivos daquele workspace.
 
 ## Kit essencial independente dos projetos
 
-O Solo-MCP prepara seu próprio Playwright e Chromium no primeiro uso da interface, com autorização do usuário. O kit fica em `~/.local/share/solo-mcp/kit-v1` e é separado do Python principal e dos ambientes de cada workspace. A página **Ferramentas** permite preparar/reparar o kit e verificar se funciona. Não é preciso conhecer pip ou venv para utilizar as inspeções.
+O Solo prepara seu próprio Playwright e Chromium no primeiro uso da interface, com autorização do usuário. O kit fica em `~/.local/share/solo-mcp/kit-v1` e é separado do Python principal e dos ambientes de cada workspace. A página **Ferramentas** permite preparar/reparar o kit e verificar se funciona. Não é preciso conhecer pip ou venv para utilizar as inspeções.
 
 O suporte X11 para capturar janelas pode exigir a instalação de pacotes do sistema operacional, com confirmação e autenticação administrativa separadas. [Detalhes da inspeção visual](INSPECTION.md).
 
 ## Aba Ambiente — para que serve Podman?
 
 **Podman** executa contêineres: ambientes separados para Python, pacotes,
-bibliotecas e testes. No Solo-MCP, as operações existentes
+bibliotecas e testes. No Solo, as operações existentes
 `sandbox_install` e `sandbox_run` usam Podman rootless:
 
 - Instalação de dependências: acesso de rede, mas **sem montar o projeto**,
@@ -90,7 +90,7 @@ O comando `sudo` instala o programa pela distribuição; **não** execute
 o contêiner com `sudo`. Prefira operar com seu usuário normal (rootless).
 
 Esta versão ainda não oferece um instalador gráfico de bibliotecas Python.
-A funcionalidade está no executor do Solo-MCP, com aprovação local, e sua
+A funcionalidade está no executor do Solo, com aprovação local, e sua
 primeira execução deve ser validada no computador real.
 
 ## Limites intencionais

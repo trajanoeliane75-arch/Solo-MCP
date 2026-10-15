@@ -1,7 +1,7 @@
 # Inspecionar tela — Playwright e janelas Linux
 
 Objetivo concreto: o usuário pergunta "por que meu aplicativo ficou assim?" e
-o Solo-MCP entrega à IA **uma imagem real** da interface, sem o usuário
+o Solo entrega à IA **uma imagem real** da interface, sem o usuário
 recortar, copiar ou anexar uma captura manualmente.
 
 ## Escopo mínimo
@@ -33,7 +33,7 @@ mensagens privadas ou dados que não deseja enviar ao GitHub.
 
 ## Preparação automática do kit interno
 
-O usuário não precisa executar comandos pip nem preparar Playwright ou Chromium manualmente. Depois de atualizar o Solo-MCP, abra **Ferramentas → Preparar kit** na janela principal.
+O usuário não precisa executar comandos pip nem preparar Playwright ou Chromium manualmente. Depois de atualizar o Solo, abra **Ferramentas → Preparar kit** na janela principal.
 
 Após a confirmação, ele cria um ambiente Python privado em `~/.local/share/solo-mcp/kit-v1`, instala uma versão definida do Playwright, baixa o Chromium e abre o navegador num teste real. As etapas aparecem no painel de progresso, com **Ver detalhes**. A página **Ferramentas** oferece **Reparar kit** em caso de falha.
 

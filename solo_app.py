@@ -8,6 +8,7 @@ import threading
 from solo_ui import AppBackend
 
 UI_ROOT = Path(__file__).resolve().parent / "ui"
+APP_ICON = UI_ROOT.parent / "share" / "icons" / "solo-128.png"
 
 
 def create_application(initial_page="home", backend=None, application_id="io.github.solo_mcp.Desktop"):
@@ -27,7 +28,7 @@ def create_application(initial_page="home", backend=None, application_id="io.git
 
         def notify_pending(self, count):
             if not self.closed and count > 0:
-                notice = Gio.Notification.new("Nova solicitação no Solo-MCP")
+                notice = Gio.Notification.new("Nova solicitação no Solo")
                 notice.set_body(
                     "Há uma tarefa aguardando sua autorização. Abra Aprovações."
                     if count == 1 else
@@ -43,10 +44,16 @@ def create_application(initial_page="home", backend=None, application_id="io.git
             if self.window:
                 self.window.present()
                 return
-            self.window = Gtk.ApplicationWindow(application=self, title="Solo-MCP")
+            self.window = Gtk.ApplicationWindow(application=self, title="Solo")
             self.window.set_default_size(1200, 800)
             self.window.set_size_request(760, 560)
-            self.window.set_icon_name("folder-remote")
+            if APP_ICON.is_file():
+                try:
+                    self.window.set_icon_from_file(str(APP_ICON))
+                except Exception:
+                    pass  # Continue even if an icon loader is unavailable.
+            else:
+                self.window.set_icon_name("solo-agent")
             self.window.connect("delete-event", self.request_close)
             manager = WebKit2.UserContentManager()
             manager.connect("script-message-received::solo", self.receive)
