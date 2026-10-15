@@ -2,7 +2,7 @@
 
 A screenshot is sensitive data. Only call from the approval-gated inspect_screen
 action, and return bytes in memory for the private control-channel transport.
-No continuous recording, background screenshot or automatic Chrome attachment.
+No continuous recording; automated Figma capture requires specific approval.
 """
 import base64
 import json
@@ -27,7 +27,10 @@ def validate_target(task):
     if mode == "window":
         if task.get("url") is not None:
             raise ValueError("Inspeção de janela não aceita URL")
-        return {"mode": "window"}
+        window_target = task.get("window_target", "pick")
+        if window_target not in ("pick", "figma"):
+            raise ValueError("Destino da janela inválido")
+        return {"mode": "window", "window_target": window_target}
     url = task.get("url")
     if not isinstance(url, str) or not 1 <= len(url) <= 600 or any(
         ord(c) < 32 for c in url
@@ -48,6 +51,15 @@ def validate_target(task):
 
 def describe_target(task):
     target = validate_target(task)
+    if target["mode"] == "window" and target.get("window_target") == "figma":
+        return (
+            "CAPTURA ÚNICA DA JANELA FIGMA NO LINUX.\n"
+            "O Solo-MCP identificará a janela do navegador com Figma no título, "
+            "a trará para a frente e fará UM print sem seleção manual.\n"
+            "A imagem da janela poderá mostrar dados pessoais e será enviada "
+            "somente à Issue no repositório de CONTROLE PRIVADO do GitHub.\n"
+            "Autorize apenas se a aba Figma não mostrar informações sensíveis."
+        )
     if target["mode"] == "window":
         return (
             "CAPTURA DE JANELA LINUX.\n"
@@ -189,8 +201,8 @@ def inspect_web(url):
     )
 
 
-def inspect_window():
-    """Require explicit mouse selection of a single X11 window after approval."""
+def inspect_window(window_target="pick"):
+    """Capture a picked window, or an explicitly approved Figma window."""
     if os.name != "posix" or not os.environ.get("DISPLAY"):
         raise RuntimeError("Captura de janela exige uma sessão gráfica Linux com DISPLAY")
     if os.environ.get("XDG_SESSION_TYPE", "x11").lower() == "wayland":
@@ -204,13 +216,34 @@ def inspect_window():
                 "Programa necessário para capturar uma janela não encontrado: "
                 + program + ". Instale x11-utils e imagemagick (no Linux Mint/Ubuntu)."
             )
-    # xwininfo with no window id prompts the user to CLICK a target.
-    try:
+    if window_target == "figma":
+        if not shutil.which("wmctrl"):
+            raise RuntimeError("wmctrl não está instalado; captura automática indisponível")
+        listed = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, timeout=8)
+        if listed.returncode:
+            raise RuntimeError("Falha ao localizar janelas X11")
+        matches = []
+        for line in listed.stdout.splitlines():
+            parts = line.split(None, 3)
+            if len(parts) == 4 and ("figma" in parts[3].lower()):
+                matches.append(parts[0])
+        if len(matches) != 1:
+            raise RuntimeError(
+                "Esperava uma janela do Figma; foram encontradas " + str(len(matches))
+                + ". Deixe apenas uma janela do Figma aberta."
+            )
         picked = subprocess.run(
-            ["xwininfo"], capture_output=True, text=True, timeout=60, check=False
+            ["xwininfo", "-id", matches[0]],
+            capture_output=True, text=True, timeout=8, check=False
         )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError("Seleção de janela cancelada após 60 segundos") from exc
+    else:
+        # Manual selection remains available for other applications.
+        try:
+            picked = subprocess.run(
+                ["xwininfo"], capture_output=True, text=True, timeout=60, check=False
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("Seleção de janela cancelada após 60 segundos") from exc
     if picked.returncode:
         raise RuntimeError("Não foi possível selecionar a janela Linux")
     found = WINDOW_ID.search(picked.stdout)
@@ -230,6 +263,15 @@ def inspect_window():
         raise RuntimeError("Não foi possível validar a janela raiz do desktop")
     if int(window_id, 16) == int(root_match.group(1), 16):
         raise RuntimeError("Captura da área de trabalho inteira bloqueada: selecione uma janela")
+    if window_target == "figma":
+        raised = subprocess.run(
+            ["wmctrl", "-ia", window_id],
+            capture_output=True, text=True, timeout=6, check=False
+        )
+        if raised.returncode:
+            raise RuntimeError("Não foi possível colocar a janela Figma em primeiro plano")
+        import time
+        time.sleep(1.0)
     try:
         screenshot = subprocess.run(
             ["import", "-window", window_id, "-quality", "55", "jpeg:-"],
@@ -254,7 +296,7 @@ def inspect(task):
     target = validate_target(task)
     if target["mode"] == "web":
         return inspect_web(target["url"])
-    return inspect_window()
+    return inspect_window(target.get("window_target", "pick"))
 
 if __name__ == "__main__":
     if len(sys.argv) != 3 or sys.argv[1] != "--web-worker":
