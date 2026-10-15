@@ -39,8 +39,11 @@ def decide(config, gh, number, digest, allow):
     owner = sm.require_private_repo(gh,repo)['owner']['login'].lower()
     issue_path = '/repos/' + repo + '/issues/' + str(int(number))
     issue = gh.request('GET', issue_path)
-    if issue.get('state') != 'open' or issue.get('user',{}).get('login','').lower() != owner:
-        raise ValueError('Issue indisponível ou autor não autorizado')
+    if issue.get('user',{}).get('login','').lower() != owner:
+        raise ValueError('Autor da Issue não autorizado. Nenhuma operação foi executada.')
+    if issue.get('state') != 'open':
+        # A stale preview is not an authorization error. Never re-run a closed task.
+        return {'ok': True, 'result': {'status': 'already_closed'}}
     task = sm.parse_task(issue.get('body',''))
     if task is None or task.get('action') not in sm.MUTATING_ACTIONS or fingerprint(task) != digest:
         raise ValueError('Tarefa mudou após a prévia: atualize e revise novamente')

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Solo-MCP — Abrir e instalar
+Comment=Preparar e abrir o aplicativo
+Terminal=false
+Icon=folder-remote
+Exec=/usr/bin/python3 -c "import pathlib,runpy,sys,urllib.parse; p=pathlib.Path(urllib.parse.unquote(urllib.parse.urlparse(sys.argv[1]).path)).parent; sys.path.insert(0,str(p)); runpy.run_path(str(p/'launch.py'),run_name='__main__')" %k

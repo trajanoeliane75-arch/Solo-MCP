@@ -42,7 +42,11 @@ function toast(message, error=false) {
 }
 function modal(title, description, body, label, action, danger=false, dismiss=null) {
   if ($('#dialog').open) closeModal();
-  previousFocus=document.activeElement; modalAction=action;modalDismiss=dismiss;
+  // A click handler temporarily disables its trigger, which can blur it to body.
+  const focused=document.activeElement;
+  const approvalReject=$('#approval-dialog[open] [data-action="reject-task"]');
+  previousFocus=focused!==document.body ? focused : (approvalReject || focused);
+  modalAction=action;modalDismiss=dismiss;
   $('#dialog-content').innerHTML=`<form id="modal-form" novalidate><div class="modal-head"><div><h2 id="dialog-title">${esc(title)}</h2><p>${esc(description)}</p></div><button type="button" class="icon-button" data-action="close-modal" aria-label="Fechar">${icon('x')}</button></div><div class="modal-body">${body}<div id="modal-error" class="modal-error" role="alert"></div></div><div class="modal-footer"><button type="button" class="button ghost" data-action="close-modal">Cancelar</button><button type="submit" id="modal-submit" class="button ${danger?'danger':'primary'}">${esc(label)}</button></div></form>`;
   $('#dialog').showModal(); const focus=$('input:not([readonly]),textarea', $('#dialog')) || (danger ? $('.modal-footer [data-action="close-modal"]') : $('#modal-submit'));focus.focus();
 }
@@ -244,19 +248,56 @@ function taskSummary(t) {
  }
  return '<section class="modal-copy"><h3>O que esta tarefa fará</h3><p>'+action+'</p>'+description+'<p><strong>Workspace:</strong> '+workspace+'</p>'+path+'<p class="muted">A descrição informa a intenção do pedido, mas não garante o comportamento do código. Consulte os detalhes para comandos desconhecidos.</p></section>';
 }
+function captureNote(t) {
+ if (t.action!=='inspect_screen') return '';
+ if (t.mode==='window' && t.window_target==='figma')
+   return '<div class="note warning mt">A captura pode revelar informações privadas e será enviada à Issue do controle. O Solo-MCP vai localizar automaticamente a janela do Figma; não é necessário clicar em nada.</div>';
+ if (t.mode==='window')
+   return '<div class="note warning mt">A captura pode revelar informações privadas e será enviada à Issue do controle. Após autorizar, clique na janela desejada quando o cursor mudar.</div>';
+ return '<div class="note warning mt">A captura pode revelar informações privadas e será enviada à Issue do controle.</div>';
+}
+let approvalItem = null;
+let approvalReturnTaskNumber = null; // Separate from the generic modal previousFocus.
 function reviewTask(number) {
  const item=state.tasks.find(t=>t.number===number);if(!item)return;
+ approvalItem=item;
+ approvalReturnTaskNumber=number;
  const t=item.task,sensitive=t.action==='inspect_screen';
- const capture=sensitive?'<div class="note warning mt">A captura pode revelar informações privadas e será enviada à Issue do controle. Você deve escolher a janela ou página indicada.</div>':'';
+ const capture=captureNote(t);
  const command=t.action==='run'?'<div class="note warning mt">Este comando não será isolado em contêiner; ele usa os direitos da sua conta Linux.</div>':'';
  const details='<details class="mt"><summary>Ver código e parâmetros técnicos</summary><pre>'+esc(JSON.stringify(t,null,2))+'</pre></details>';
- const reject=button('Recusar tarefa','reject-task','type="button" data-number="'+number+'" data-digest="'+item.digest+'"','danger','x');
- modal('Revisar tarefa #'+number,(actionNames[t.action]||t.action)+' · '+(t.workspace||t.project),
-   taskSummary(t)+capture+command+details+'<div class="button-row">'+reject+'</div>',
-   'Autorizar e executar',async()=>{
-     const result=await api('decision',{number,digest:item.digest,allow:true});
-     closeModal();await beginJob(result);
-   });
+ $('#approval-content').innerHTML='<button class="icon-button approval-close" type="button" data-action="close-review" aria-label="Voltar para aprovações">'+icon('x')+'</button>'+
+   '<div class="approval-inner">'+
+   '<div class="approval-eyebrow">APROVAÇÃO NECESSÁRIA · SOLICITAÇÃO #'+number+'</div>'+
+   '<h1 id="approval-title" class="approval-title">'+esc(actionNames[t.action]||t.action)+'</h1>'+
+   '<div class="approval-sub">'+esc(t.workspace||t.project||'')+(t.path?' · '+esc(t.path):'')+'</div>'+
+   taskSummary(t)+capture+command+details+
+   '<div class="button-row mt">'+
+     button('Autorizar e executar','authorize-review','','primary','check')+
+     button('Recusar tarefa','reject-task','type="button" data-number="'+number+'" data-digest="'+item.digest+'"','danger','x')+
+   '</div>'+
+   '<div id="approval-error" class="modal-error" role="alert"></div>'+
+   '<p class="helper-line">O resultado é publicado na Issue privada de controle.</p>'+
+   '</div>';
+ $('#approval-dialog').showModal();
+ $('#approval-dialog .approval-close').focus();
+}
+function closeApproval() {
+ const number=approvalReturnTaskNumber;
+ if ($('#approval-dialog').open) $('#approval-dialog').close();
+ approvalItem=null;
+ approvalReturnTaskNumber=null;
+ // Resolve a live trigger again: it may have been disabled or re-rendered
+ // while opening the dialog, and the generic modal has its own focus state.
+ const trigger=$$('[data-action="review"]').find(el=>Number(el.dataset.number)===number && !el.disabled);
+ if (trigger) trigger.focus();
+ else if ($('#main')) $('#main').focus();
+}
+async function authorizeReview() {
+ if (!approvalItem) return;
+ const {number,digest}=approvalItem;
+ const result=await api('decision',{number,digest,allow:true});
+ closeApproval();await beginJob(result);
 }
 async function beginJob(result) {if(!result?.job_id)return;state.finishedJob=null;await pollJob();}
 async function pollJob() {
@@ -264,7 +305,8 @@ async function pollJob() {
   const job=await api('job_status');if(!job)return;state.job=job;
   if(job.id===state.finishedJob)return;
   const el=$('#job-banner');el.hidden=false;
-  const line=job.status==='error'?'Não foi possível concluir: '+friendlyError(job.error):job.status==='done'?(job.title==='Verificar ferramentas'?'Verificação concluída. As ferramentas foram verificadas. Clique em Ver detalhes para consultar os resultados.':'Operação concluída. Clique em Ver detalhes para consultar os resultados.'):(job.lines.at(-1)||'Em andamento. Aguarde a conclusão…');
+  const alreadyClosed=job.status==='done' && job.result?.result?.status==='already_closed';
+  const line=job.status==='error'?'Não foi possível concluir: '+friendlyError(job.error):alreadyClosed?'Esta tarefa já estava encerrada no GitHub. Nenhum comando foi executado novamente; a fila será atualizada.':job.status==='done'?(job.title==='Verificar ferramentas'?'Verificação concluída. As ferramentas foram verificadas. Clique em Ver detalhes para consultar os resultados.':'Operação concluída. Clique em Ver detalhes para consultar os resultados.'):(job.lines.at(-1)||'Em andamento. Aguarde a conclusão…');
   el.innerHTML=`<div class="job-title"><span>${esc(job.title)}</span>${job.status==='running'?icon('loader-circle','spinning'):`<button class="icon-button" data-action="dismiss-job" aria-label="Fechar resultado">${icon('x')}</button>`}</div><div class="job-line ${job.status==='error'?'invalid':''}">${esc(line)}</div><div class="button-row mt">${button('Ver detalhes','job-details','','small')}${job.title==='Conectar conta GitHub'?button('Abrir GitHub','external','data-target="device"','small','arrow-up-right'):''}</div>`;
   if(job.status!=='running') {
     state.finishedJob=job.id;await refreshData();
@@ -272,7 +314,7 @@ async function pollJob() {
     if(!state.dirty&&!state.permissionsDirty&&!['workspace','settings'].includes(state.page))render();
     if(state.page==='settings'&&!state.connectionDirty&&!$('#control-repo')?.matches(':focus'))render();
     if(state.page==='approvals')await loadApprovals();
-    toast(job.status==='error'?'A operação não foi concluída. Veja os detalhes.':job.title+' · concluído.',job.status==='error');
+    toast(job.status==='error'?'A operação não foi concluída. Veja os detalhes.':alreadyClosed?'Tarefa já encerrada no GitHub; nada foi repetido.':job.title+' · concluído.',job.status==='error');
   }
  } catch(error) {console.error(error.message);}
 }
@@ -313,7 +355,9 @@ async function execute(action, el) {
  case 'external':return api('open_link',{target:el.dataset.target});
  case 'refresh-approvals':return loadApprovals(true);
  case 'review':return reviewTask(Number(el.dataset.number));
- case 'reject-task':{const number=Number(el.dataset.number),digest=el.dataset.digest;return confirmAction('Recusar tarefa #'+number+'?','<p>A recusa será registrada na Issue privada e a tarefa será encerrada sem execução.</p>','Recusar tarefa',async()=>{const r=await api('decision',{number,digest,allow:false});closeModal();await beginJob(r);},true);}
+ case 'close-review':return closeApproval();
+ case 'authorize-review':return authorizeReview();
+ case 'reject-task':{const number=Number(el.dataset.number),digest=el.dataset.digest;return confirmAction('Recusar tarefa #'+number+'?','<p>A recusa será registrada na Issue privada e a tarefa será encerrada sem execução.</p>','Recusar tarefa',async()=>{const r=await api('decision',{number,digest,allow:false});closeModal();closeApproval();await beginJob(r);},true);}
  case 'job-details':return jobDetails();
  case 'dismiss-job':$('#job-banner').hidden=true;return;
  case 'theme':{const dark=document.documentElement.dataset.theme!=='dark';document.documentElement.dataset.theme=dark?'dark':'light';try{localStorage.setItem('solo-theme',dark?'dark':'light');}catch{}$('#theme-toggle').innerHTML=icon(dark?'sun':'moon');toast(dark?'Tema escuro ativado.':'Tema claro ativado.');return;}
@@ -322,7 +366,7 @@ async function execute(action, el) {
 document.addEventListener('click',async event=>{
  const el=event.target.closest('[data-action]');if(!el||el.disabled)return;event.preventDefault();
  const keep=el.innerHTML;el.disabled=true;if(el.classList.contains('button'))el.innerHTML=icon('loader-circle','spinning')+'<span>'+esc(el.textContent.trim())+'</span>';
- try{await execute(el.dataset.action,el);}catch(error){if($('#dialog').open&&$('#modal-error'))$('#modal-error').textContent=friendlyError(error.message);else toast(friendlyError(error.message),true);}
+ try{await execute(el.dataset.action,el);}catch(error){if($('#dialog').open&&$('#modal-error'))$('#modal-error').textContent=friendlyError(error.message);else if($('#approval-dialog').open&&$('#approval-error'))$('#approval-error').textContent=friendlyError(error.message);else toast(friendlyError(error.message),true);}
  finally{if(el.isConnected){if(el.dataset.action!=='theme')el.innerHTML=keep;el.disabled=false;if(el.id==='save-context')updateContextCounter();}}
 });
 document.addEventListener('submit',async event=>{
@@ -354,6 +398,7 @@ document.addEventListener('change',async event=>{
  if(el.id==='autostart'){const value=el.checked;el.disabled=true;try{await api('autostart',{enabled:value});await refreshData();toast(value?'O aplicativo abrirá ao entrar no Linux.':'Inicialização automática desativada.');}catch(error){el.checked=!value;toast(friendlyError(error.message),true);}finally{el.disabled=false;}}
 });
 $('#dialog').addEventListener('cancel',event=>{event.preventDefault();closeModal();});
+$('#approval-dialog').addEventListener('cancel',event=>{event.preventDefault();closeApproval();});
 document.addEventListener('keydown',event=>{
  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'&&$('#context-editor')&&!$('#dialog').open){event.preventDefault();if(!$('#save-context').disabled)saveContext().catch(e=>toast(e.message,true));}
  if(event.target.matches('[role="tab"]')&&['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const tabs=$$('[role="tab"]'),i=tabs.indexOf(event.target);const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(i+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[next].focus();}

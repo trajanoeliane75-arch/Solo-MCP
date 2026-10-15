@@ -12,8 +12,8 @@
   <a href="#main" class="skip-link">Ir para o conteúdo</a>
   <div class="app-shell">
     <aside class="sidebar" aria-label="Navegação principal">
-      <button class="brand" data-action="nav" data-page="home" aria-label="Solo-MCP, início"><span class="brand-symbol">s</span><span>Solo<span class="brand-light"> / MCP</span></span></button>
-      <div class="local-label"><span class="dot"></span> Seu espaço local</div>
+      <button class="brand" data-action="nav" data-page="home" aria-label="Solo-MCP, início">Solo-MCP</button>
+      <div class="local-label"><span class="dot"></span> Espaço local</div>
       <nav id="navigation"></nav>
       <div class="sidebar-section"><span>WORKSPACES</span><button class="icon-button" data-action="create" aria-label="Novo workspace"><img src="icons/plus.svg" alt=""></button></div>
       <div id="workspace-nav" class="workspace-nav"></div>
@@ -24,7 +24,7 @@
       </div>
     </aside>
     <div class="main-shell">
-      <header class="topbar"><div id="breadcrumb">Início</div><div class="topbar-actions"><span class="local-note"><img src="icons/lock-keyhole.svg" alt=""> Armazenamento local</span><button id="theme-toggle" class="icon-button" data-action="theme" aria-label="Mudar tema"><img src="icons/moon.svg" alt=""></button></div></header>
+      <header class="topbar"><div id="breadcrumb">Início</div><div class="topbar-actions"><button id="theme-toggle" class="icon-button" data-action="theme" aria-label="Mudar tema"><img src="icons/moon.svg" alt=""></button></div></header>
       <div id="preview-notice" hidden>Ambiente de teste · dados temporários, separados dos seus projetos</div>
       <main id="main" tabindex="-1"><div class="loading-state" role="status">Abrindo seu espaço…</div></main>
       <div id="job-banner" hidden aria-live="polite"></div>
@@ -32,5 +32,6 @@
   </div>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+  <dialog id="approval-dialog" class="approval-dialog" aria-labelledby="approval-title"><div id="approval-content"></div></dialog>
 </body>
 </html>
