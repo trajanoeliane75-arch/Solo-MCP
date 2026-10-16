@@ -1,19 +1,59 @@
 # Solo
 
-**Acabaram os créditos de Work ou Codex no meio do projeto?** O Solo permite
-continuar trabalhando com ajuda do ChatGPT: a conversa envia instruções curtas
-por um repositório privado do GitHub e **o seu próprio computador executa as
-tarefas**, depois da sua autorização quando necessário. Seus projetos e
-arquivos permanecem no seu computador.
+[Português](README.md) · [English](README.en.md) · [Releases](https://github.com/trajanoeliane75-arch/Solo-MCP/releases) · [Instalação detalhada](docs/GUI.md)
 
-O Solo é uma janela para projetos locais, contexto, permissões e aprovações.
-A interface desktop usa **Python + GTK/WebKitGTK** e HTML/CSS local, sem
-terminal no uso diário, Electron ou build de frontend.
+![Testes](https://github.com/trajanoeliane75-arch/Solo-MCP/actions/workflows/tests.yml/badge.svg)
 
-> **O que o Solo é:** uma ponte entre ChatGPT, GitHub Issues privadas e um agente
-> Python local. **O que ainda não é:** um servidor do protocolo MCP (Model
-> Context Protocol). Usar a integração exige acesso à conversa e ao GitHub;
-> o Solo não recupera créditos nem contorna limites da sua conta.
+**Acabaram os créditos de Work ou Codex no meio do projeto? Continue trabalhando no seu próprio Linux.**
+
+O **Solo** permite que o ChatGPT solicite tarefas por meio de um **repositório privado do GitHub**. O programa roda no seu computador, organiza seus workspaces e exige sua autorização para operações sensíveis. Seus arquivos continuam no Linux.
+
+![Demonstração do Solo: início, fila e revisão de uma tarefa](docs/media/solo-demo.gif)
+
+*Prévia da interface com dados fictícios. Nenhuma tarefa real foi executada para produzir essa demonstração.*
+
+<details>
+<summary>Capturas individuais da interface</summary>
+
+**Página inicial**
+
+![Página inicial do Solo](docs/media/solo-home.png)
+
+**Fila de aprovações**
+
+![Fila de aprovações](docs/media/solo-approvals.png)
+
+**Revisar e autorizar**
+
+![Modal de autorização](docs/media/solo-review.png)
+
+</details>
+
+## Como funciona
+
+1. **Peça uma tarefa ao ChatGPT.** A conversa precisa estar conectada ao GitHub e criar uma Issue em seu repositório **privado** de controle.
+2. **O Solo verifica o pedido** no Linux, respeitando o workspace e as permissões configuradas.
+3. **Você revisa as ações sensíveis.** Após sua autorização, o Solo executa o que for permitido e publica o resultado na Issue privada para o ChatGPT consultar.
+
+O Solo **não é um servidor MCP**, não restaura créditos e não contorna limites do plano de IA. Comandos de terminal usam os direitos da sua conta Linux e não são automaticamente isolados: **revise antes de autorizar**.
+
+## Instalação rápida
+
+**Requer Linux.** Debian/Ubuntu são o alvo principal (GTK3, WebKitGTK 4.1 e Polkit). Fedora e Arch exigem a preparação manual das dependências; veja [docs/GUI.md](docs/GUI.md). Captura de janelas do computador exige **X11**.
+
+~~~bash
+git clone https://github.com/trajanoeliane75-arch/Solo-MCP.git
+cd Solo-MCP
+./install.sh
+~~~
+
+Também é possível abrir **Solo-MCP.desktop** pelo gerenciador de arquivos e autorizar a execução do atalho quando necessário. O nome exibido no menu é **Solo**; nomes internos antigos foram mantidos por compatibilidade.
+
+Depois de abrir, conecte o GitHub em **Configurações**, crie um **repositório privado separado** para tarefas e adicione seu workspace. Veja o [guia de primeiro uso](docs/GUI.md).
+
+> **Licença:** [PolyForm Noncommercial 1.0.0](LICENSE). Código disponível para colaboração e uso não comercial (*source-available*); **não** é open source aprovado pela OSI.
+
+---
 
 ## Nova experiência desktop
 
