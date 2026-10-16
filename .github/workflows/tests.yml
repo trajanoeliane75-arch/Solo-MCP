@@ -68,3 +68,34 @@ jobs:
         run: python -c 'import solo_kit; solo_kit.prepare()'
       - name: Inspect real localhost app
         run: SOLO_MCP_BROWSER_TESTS=1 python -m unittest discover -s tests -p test_inspect_e2e.py -v
+
+
+  deb-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify packaging metadata and safety in isolation
+        run: python3 -m unittest discover -s tests -p test_deb_packaging.py -v
+      - name: Build Solo Debian package
+        run: python3 packaging/deb/build.py --version 1.0.1 --output dist
+      - name: Install and remove the package on disposable Ubuntu runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.config/solo-mcp"
+          printf '{"test":"preserve"}\n' > "$HOME/.config/solo-mcp/config.json"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ./dist/solo-agent_1.0.1_all.deb
+          test -x /usr/bin/solo-agent
+          test -f /usr/share/applications/solo-agent.desktop
+          test -f /usr/share/solo-agent/ui/index.html
+          test -f /usr/share/icons/hicolor/128x128/apps/solo-agent.png
+          sudo apt-get purge -y -qq solo-agent
+          test ! -e /usr/bin/solo-agent
+          test ! -e /usr/share/applications/solo-agent.desktop
+          grep -q '"test":"preserve"' "$HOME/.config/solo-mcp/config.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solo-debian-package
+          path: dist/solo-agent_1.0.1_all.deb
+          if-no-files-found: error

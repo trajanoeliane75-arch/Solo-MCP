@@ -37,6 +37,18 @@ O **Solo** permite que o ChatGPT solicite tarefas por meio de um **repositório 
 
 O Solo **não é um servidor MCP**, não restaura créditos e não contorna limites do plano de IA. Comandos de terminal usam os direitos da sua conta Linux e não são automaticamente isolados: **revise antes de autorizar**.
 
+## Instalação com pacote .deb (Debian/Ubuntu)
+
+A partir do **Solo v1.0.1**, também é possível [baixar o pacote .deb da página de Releases](https://github.com/trajanoeliane75-arch/Solo-MCP/releases/latest). Escolha o arquivo **solo-agent_1.0.1_all.deb** em *Assets*, abra-o no instalador de pacotes da distribuição ou instale-o pelo gerenciador de pacotes:
+
+~~~bash
+sudo apt install ./solo-agent_1.0.1_all.deb
+~~~
+
+O pacote coloca **Solo** no menu de aplicativos e inclui o ícone original. **Não instala, substitui nem reinicia automaticamente o seu serviço de tarefas.** Se você já usava Solo por ZIP ou git clone, o atalho anterior e o serviço antigo podem coexistir. Revise-os antes de decidir remover o atalho antigo. Seus workspaces e as configurações em ~/.config/solo-mcp/ permanecem intocados na instalação, atualização e remoção do pacote.
+
+Consulte as [instruções detalhadas do .deb](packaging/deb/README.md). Em Fedora e Arch, mantenha o método de instalação pelo código-fonte.
+
 ## Instalação rápida
 
 **Requer Linux.** Debian/Ubuntu são o alvo principal (GTK3, WebKitGTK 4.1 e Polkit). Fedora e Arch exigem a preparação manual das dependências; veja [docs/GUI.md](docs/GUI.md). Captura de janelas do computador exige **X11**.

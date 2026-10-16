@@ -1,0 +1,43 @@
+name: Publish Solo Debian package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  debian-release:
+    if: github.repository == 'trajanoeliane75-arch/Solo-MCP'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact tagged source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate Debian packaging without root or system changes
+        run: python3 -m unittest discover -s tests -p test_deb_packaging.py -v
+      - name: Build distribution package from this tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          python3 packaging/deb/build.py --version "$version" --output dist
+          test -f "dist/solo-agent_${version}_all.deb"
+          dpkg-deb --info "dist/solo-agent_${version}_all.deb"
+      - name: Publish release and attach Debian package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" \
+              --title "Solo $GITHUB_REF_NAME — Debian/Ubuntu installer" \
+              --notes-file packaging/deb/RELEASE_NOTES.md \
+              --verify-tag
+          fi
+          gh release upload "$GITHUB_REF_NAME" "dist/solo-agent_${version}_all.deb" --clobber

@@ -28,6 +28,18 @@ The source-code repository may be public, but your **control repository must be 
 
 ![Review a requested action](docs/media/solo-review.png)
 
+## Debian/Ubuntu .deb package (v1.0.1+)
+
+From **Solo v1.0.1**, you can [download the native Debian package from Releases](https://github.com/trajanoeliane75-arch/Solo-MCP/releases/latest). Look under *Assets* for **solo-agent_1.0.1_all.deb**. Open it in your distribution's graphical package manager or install it with:
+
+~~~bash
+sudo apt install ./solo-agent_1.0.1_all.deb
+~~~
+
+The package installs Solo into the desktop applications menu and registers its original icon. **It does not automatically migrate, replace, or restart an existing user background service.** If you previously installed Solo from a ZIP or git clone, an older launcher and service may coexist with the new package. Verify both before removing the old shortcut. Your personal workspaces and ~/.config/solo-mcp/ configuration are not deleted by package removal.
+
+See the [Debian packaging guide](packaging/deb/README.md). Fedora and Arch users should continue using the source installation instructions.
+
 ## Installation
 
 **Platform:** Linux desktop, Python 3, GTK 3 and WebKitGTK 4.1. Debian/Ubuntu are the main tested target; the GUI can guide dependency setup **when GTK3 and Polkit are already installed**. Fedora and Arch require manual dependency installation as documented in [docs/GUI.md](docs/GUI.md). X11 is required for native window capture. Windows and macOS are not supported.
