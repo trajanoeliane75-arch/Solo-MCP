@@ -273,7 +273,8 @@ class ImageTransportTests(unittest.TestCase):
         with patch.object(sm,"do_task",return_value=inspect.make_image_result(JPEG,"window")):
             done=desktop.decide(config,Gh(),16,desktop.fingerprint(task),True)
         self.assertNotIn("_image_b64",str(done))
-        self.assertTrue(bodies[0].startswith(images.IMAGE_MARKER))
+        self.assertTrue(bodies[0].startswith(desktop.STATUS_MARKER))
+        self.assertTrue(bodies[1].startswith(images.IMAGE_MARKER))
         self.assertTrue(bodies[-1].startswith(sm.RESULT_MARKER))
 
 
