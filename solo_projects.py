@@ -14,6 +14,7 @@ ACTION_CAPABILITIES = {
     "file_info": ("read",),
     "workspace_info": ("read",),
     "workspace_context": ("read",),
+    "context_search": ("read",),
     "doc_read": ("read",),
     "git_status": ("read",),
     "write": ("write",),
