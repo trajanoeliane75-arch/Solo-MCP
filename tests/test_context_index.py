@@ -42,7 +42,7 @@ class ContextIndexTests(unittest.TestCase):
         self.assertEqual(result["matches"][0]["path"], "src/ink.py")
         self.assertLessEqual(result["matches"][0]["line_start"], 4)
         self.assertGreaterEqual(result["matches"][0]["line_end"], 4)
-        self.assertIn("[pen]_[stroke]", result["matches"][0]["excerpt"])
+        self.assertIn("[pen_stroke]", result["matches"][0]["excerpt"])
         self.assertGreaterEqual(result["files_indexed"], 2)
 
     def test_incremental_update_and_deletion(self):
