@@ -42,7 +42,7 @@ class ContextIndexTests(unittest.TestCase):
         self.assertEqual(result["matches"][0]["path"], "src/ink.py")
         self.assertLessEqual(result["matches"][0]["line_start"], 4)
         self.assertGreaterEqual(result["matches"][0]["line_end"], 4)
-        self.assertIn("pen_stroke", result["matches"][0]["excerpt"])
+        self.assertIn("[pen]_[stroke]", result["matches"][0]["excerpt"])
         self.assertGreaterEqual(result["files_indexed"], 2)
 
     def test_incremental_update_and_deletion(self):
@@ -86,7 +86,7 @@ class ContextIndexTests(unittest.TestCase):
         self.assertNotIn("binary.py", [m["path"] for m in self.query("abc")["matches"]])
 
     def test_requires_read_permission_and_does_not_create_index(self):
-        self.config["projects"]["demo"]["permissions"] = {"write": True}
+        self.config["projects"]["demo"]["permissions"] = {"read": False, "write": True}
         with self.assertRaises(PermissionError):
             self.query("sample")
         self.assertFalse((self.base / "state").exists())
