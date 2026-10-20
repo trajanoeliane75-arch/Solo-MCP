@@ -33,6 +33,28 @@ def pending_details(config, gh):
     return sorted(pending, key=lambda entry:entry['number'])
 
 
+STATUS_MARKER = "SOLO_MCP_STATUS_V1"
+
+
+def publish_approval_status(gh, issue_path, digest):
+    """Best-effort status signal. Never grant rights or change task semantics.
+
+    A status comment is purely informational, unlike the durable final result.
+    Dropped status messages must never prevent an approved task from running.
+    """
+    body = STATUS_MARKER + "\n" + json.dumps({
+        "version": 1, "state": "approved", "digest": digest,
+        "source": "desktop",
+    }, ensure_ascii=False, separators=(",", ":"))
+    try:
+        gh.request("POST", issue_path + "/comments", {"body": body})
+        return True
+    except Exception as exc:
+        print("Solo: aviso de aprovação não publicado: " + str(exc)[:180],
+              file=sys.stderr)
+        return False
+
+
 def decide(config, gh, number, digest, allow):
     """Re-fetch the entire task and ensure it matches the user's preview."""
     repo = config['control_repo']
@@ -51,9 +73,15 @@ def decide(config, gh, number, digest, allow):
     if any(c.get('body','').startswith(sm.RESULT_MARKER) for c in comments):
         raise ValueError('Tarefa já contém resultado')
     import solo_execution
-    result = solo_execution.execute(repo,number,task,
-        (lambda: {'ok':True,'result':sm.do_task(config,task,approval_callback=lambda _:True)})
-        if allow else (lambda: {'ok':True,'result':{'status':'rejected'}}))
+    def approved_operation():
+        # Execution has already been durably claimed before this callback.
+        # Notify the ChatGPT-side reader immediately after local consent.
+        publish_approval_status(gh, issue_path, digest)
+        return {'ok': True, 'result': sm.do_task(
+            config, task, approval_callback=lambda _: True)}
+    result = solo_execution.execute(
+        repo, number, task, approved_operation if allow
+        else (lambda: {'ok': True, 'result': {'status': 'rejected'}}))
     return solo_execution.deliver(gh,repo,number,result,sm.publish_task_result)
 
 
