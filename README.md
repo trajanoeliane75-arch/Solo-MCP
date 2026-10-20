@@ -83,6 +83,16 @@ permitir leitura pelas tarefas. Novos workspaces começam somente com leitura.
 **[Inspeção visual](docs/INSPECTION.md)** ·
 **[Git local e Python](docs/GIT_AND_PYTHON.md)**
 
+## Solo Sync — confirmação de autorização
+
+O painel atualizado publica um sinal `SOLO_MCP_STATUS_V1` na Issue privada
+quando o usuário autoriza uma operação, antes da execução. O ChatGPT pode
+consultar esse estado durante uma conversa ativa, sem depender de uma
+mensagem manual "já autorizei". A resposta final permanece
+`SOLO_MCP_RESULT_V1`; não há mecanismo de iniciar mensagens
+automaticamente em conversas já encerradas.
+Veja **[o protocolo Solo Sync](docs/STATUS_SYNC.md)**.
+
 ## Solo Context — busca local inteligente
 
 O Solo agora pode buscar **trechos relevantes do código** dentro de um workspace,
