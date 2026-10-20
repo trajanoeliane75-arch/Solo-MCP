@@ -76,6 +76,7 @@ def _walk(root):
         for name in sorted(files):
             visited += 1
             if visited > MAX_WALK_ENTRIES:
+                yield None
                 return
             if _allowed(name):
                 path = Path(folder) / name
@@ -94,11 +95,11 @@ def _chunks(text):
 def _terms(query):
     if not isinstance(query, str) or not 2 <= len(query.strip()) <= 200:
         raise ValueError("Consulta deve conter de 2 a 200 caracteres")
-    parts = re.findall(r"[^\W_]{2,40}", query, re.UNICODE)
+    parts = [part for part in re.findall(r"\w{2,40}", query, re.UNICODE) if part.strip("_")]
     if not parts:
         raise ValueError("Consulta não contém termos pesquisáveis")
     # Quote each token instead of accepting FTS5 operators or syntax from Issues.
-    return " OR ".join('"' + term.replace('"', '""') + '"' for term in parts[:10])
+    return " OR ".join('"' + term.replace("_", " ") + '"' for term in parts[:10])
 
 
 def search(root, workspace, query, limit=8):
@@ -119,6 +120,9 @@ def search(root, workspace, query, limit=8):
         scanned_bytes = 0
         truncated = False
         for path in _walk(root):
+            if path is None:
+                truncated = True
+                break
             relative = str(path.relative_to(root))
             if len(seen) >= MAX_FILES:
                 truncated = True
@@ -141,6 +145,9 @@ def search(root, workspace, query, limit=8):
                 text = raw.decode("utf-8")
                 text = REDACT.sub(r"\1[REDACTED]", text)
             except (OSError, UnicodeError, ValueError):
+                # Do not return an old cached excerpt if a file became unreadable.
+                db.execute("DELETE FROM chunks WHERE path=?", (relative,))
+                db.execute("DELETE FROM tracked WHERE path=?", (relative,))
                 continue
             db.execute("DELETE FROM chunks WHERE path=?", (relative,))
             for start, end, content in _chunks(text):
