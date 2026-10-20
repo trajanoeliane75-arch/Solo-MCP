@@ -150,6 +150,9 @@ def do_task(config, task, approval_callback=None):
     if action == 'workspace_context':
         content = solo_workspaces.read_context(config, workspace_name, remote=True)
         return {'workspace': workspace_name, 'content': content, 'bytes': len(content.encode('utf-8'))}
+    if action == 'context_search':
+        from solo_context_index import search
+        return search(root, workspace_name, task.get('query'), task.get('limit', 8))
     if action == 'list':
         path = safe_path(root, task.get('path', '.'))
         if not path.is_dir():

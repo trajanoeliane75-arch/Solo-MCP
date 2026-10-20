@@ -83,6 +83,16 @@ permitir leitura pelas tarefas. Novos workspaces começam somente com leitura.
 **[Inspeção visual](docs/INSPECTION.md)** ·
 **[Git local e Python](docs/GIT_AND_PYTHON.md)**
 
+## Solo Context — busca local inteligente
+
+O Solo agora pode buscar **trechos relevantes do código** dentro de um workspace,
+sem Ollama nem bibliotecas de ML. A ação `context_search` usa SQLite FTS5
+e indexação incremental, respeita a permissão `read` e retorna referências
+de arquivo/linha em vez de copiar projetos inteiros para o GitHub.
+O índice permanece no Linux; somente os trechos solicitados vão para a
+Issue de controle privada. Consulte **[Solo Context](docs/CONTEXT_INDEX.md)**
+para exemplo, limites e cuidados com dados sensíveis.
+
 ## Kit de inspeção autogerenciado
 
 Em **Ferramentas → Preparar kit**, o Solo cria seu ambiente privado em
